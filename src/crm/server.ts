@@ -9,7 +9,7 @@ import { crmFor } from "./index.js";
 
 /** The panel on its own, until the desk mounts the router. */
 export function serveCrm(sync: CrmSync | CrmHub, opts: { port?: number; simulated?: boolean } = {}) {
-  const port = opts.port ?? Number(process.env.CRM_PORT ?? 8788), route = createCrmRouter(sync, opts);
+  const port = opts.port ?? Number(process.env.CRM_PORT ?? 8790), route = createCrmRouter(sync, opts);
   const server = createServer(async (req, res) => {
     if (await route(req, res)) return;
     res.writeHead(302, { location: "/crm" }); res.end();
