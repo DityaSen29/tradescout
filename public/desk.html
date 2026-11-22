@@ -135,7 +135,7 @@ body{font-size:15px}.demo{left:0;transform:none;border-radius:0 0 6px 0}.shell{p
 <script>
 'use strict';
 /* EXAMPLE DATA. Every company, person and figure below is invented. Only .example domains. */
-const QS=new URLSearchParams(location.search),LIVE=QS.get('live')==='1',DEMO=!LIVE&&QS.get('demo')!=='0';
+const QS=new URLSearchParams(location.search),LIVE=QS.get('live')==='1'||(QS.get('live')!=='0'&&['localhost','127.0.0.1'].includes(location.hostname)),DEMO=!LIVE&&QS.get('demo')!=='0';
 if(QS.get('theme')==='dark')document.documentElement.dataset.theme='dark';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=n=>Number(n||0).toLocaleString('en-IN'),sum=(a,f)=>a.reduce((t,x)=>t+f(x),0),rs=c=>'₹'+num(Math.round(c*.87)),plural=(n,w,p)=>`${n} ${n===1?w:(p||w+'s')}`;
@@ -290,6 +290,7 @@ function banners(){
  if(LIVE&&L.err)h+=ban('bad','The live API returned an error',esc(L.err),A('reload','Try again'));
  if(S.paused==='limit')h+=ban('warn',`Stopped at ${S.credits} of ${S.limit} credits, before going over.`,`${counts().all.length} of ${cands().length} buyers are enriched. Resume with 40 more credits (≈ ${rs(40)})?`,A('resume','Resume with 40 more','btn p'));
  else if(S.paused)h+=ban('warn',`Paused at step ${S.step}.`,S.paused==='reload'?'The page restarted mid-run. Finished work is saved and won’t be paid for again.':'Finished work is saved and won’t be paid for again.',A('resume','Resume','btn p'));
+ if(LIVE&&L.run){const se=(L.run.steps||[]).filter(s=>s.error&&s.status!=='done').map(s=>String(s.error).split('\n')[0])[0],ls=L.buyers||[];if(se&&S.wait!=='select')h+=ban('warn','The run needs attention',esc(se));if(ls.length&&!ls.some(b=>b.n))h+=ban('warn','Customs records don’t cover this search.','We researched company data and the web instead. These buyers are Amber (lower confidence) until confirmed, and none is claimed as an importer.')}
  if(S.notes.length&&!S.launched)h+=ban('warn','A data call failed',esc(S.notes[S.notes.length-1]),A('clearnote','Dismiss'));
  if(S.off)h+=ban('bad','Everything is paused.','No email will send and no run will spend until you switch it back on.',A('unpause','Resume Meridian'));
  if(!S.gmail)h+=ban('bad','Gmail disconnected at 14:02.',`Nothing will send. ${plural(counts().q.length,'approved email')} waiting.`,A('gmail','Reconnect'));
@@ -308,7 +309,7 @@ const tile=(b,s,c='')=>`<div class="inset stat"><b class="${c}">${b}</b><span>${
 const V={};
 V.start=()=>{
  const m=S.mode,val=m==='list'?S.list:m==='url'?S.url:S.req;
- return`<div class="sbar" style="padding:16px 24px;display:flex;justify-content:space-between"><div class="brand"><i></i>meridian</div>${S.step?A('back','Back to current search','link'):''}</div><div class="start">${banners()}
+ return`<div class="sbar" style="padding:16px 24px;display:flex;justify-content:space-between"><div class="brand"><i></i>meridian</div>${S.step?A('back','Back to current search','link'):''}</div><div class="start">${banners()}${!LIVE&&S.needsDesk&&offTopic()?ban('warn','This product goes to live company research.','Meridian checks customs records, then researches companies, decision makers and emails on its own server. This public page isn’t connected to that server, so nothing has been searched. Run the same request on the live desk.'):''}
  <h1>Who abroad already buys what you make?</h1><p class="lede">Describe your product the way you'd tell a buyer. Meridian reads the customs records, finds the importers who already buy it, and drafts a first email to the person who decides. Nothing is sent until you approve it.</p>
  <div class="box"><label class="lab" for="req">${m==='list'?'Companies, one per line':m==='url'?'Your website':'Your request'}</label><textarea id="req" maxlength="2000" placeholder="${m==='list'?'Names, domains or CSV':m==='url'?'https://your-company.com':'What you make, how much, and where you want to sell'}">${esc(val)}</textarea>
  ${LIVE?`<label class="sm" for="country">Market for this search</label><input id="country" value="${esc(S.country||'United States')}"><label class="sm" for="dnc">Your existing customers, never contacted (comma separated)</label><input id="dnc" value="${esc(S.dnc||'')}">`:''}
@@ -322,7 +323,7 @@ V.run=()=>{
  const c=counts(),found=LIVE?S.step>3:!!S.done.cons;
  return head(found?'Who imports it':'Reading your product',found&&S.step>3?A('go','Continue →','btn p',S.step>4?'work':'segments'):'')+
  (found?(LIVE?`<div class="card"><div class="lab">Found so far</div><h3>${plural(c.all.length,'company','companies')} on the shortlist</h3></div>`:`<div class="card"><h3>India’s share rose from 49% to 58%${fn('a')}</h3>${spark()}<div class="g4" style="margin-top:12px">${tile(num(c.ship)+fn('a'),'shipments, 12 months')+tile(c.imp+fn('a'),term('imp','importers'))+tile('$15.40'+fn('a'),term('landed','median landed price')+' per kg, all origins, where records carry values')+tile('$14.60'+fn('a'),'landed price per kg from India')}</div></div><div class="card flush" style="margin-top:12px">${legend('a')}</div>`)
- :`<div class="card flush" role="status"><p style="padding:16px">${S.step<3?'Reading your request. The next step asks you to check what we understood.':'Reading dated customs records…'}</p>${'<div class="skel"></div>'.repeat(4)}</div>`);
+ :`<div class="card flush" role="status"><p style="padding:16px">${S.step<3?'Reading your request. The next step asks you to check what we understood.':LIVE?'Checking customs records, then researching companies and the web…':'Reading dated customs records…'}</p>${'<div class="skel"></div>'.repeat(4)}</div>`);
 };
 V.codes=()=>{
  if(LIVE){const p=L.run?.plan;return head('Product codes')+`<div class="card"><div class="lab">Your product</div><h3>${esc(L.run?.run?.request?.product||S.req)}</h3><div class="lab mt">${term('hsn','HSN codes')} chosen by the planner</div><div class="chips">${p?(p.hs||[]).map(h=>`<span class="chip"><b class="mono">${esc(h.code||h)}</b> ${esc(h.text||h.why||'')}</span>`).join('')||'None':'Planning…'}</div><p class="sub" style="margin-top:12px">The live API doesn’t pause for a code check yet.</p></div>`}
@@ -451,8 +452,22 @@ V.replies=()=>LIVE?na('Replies','Replies come from the separate outreach module.
 V.pipeline=()=>{
  const c=counts(),hs=LIVE?[]:REPLIES,total=LIVE?0:sum(SEGS,s=>s.hist.sent);
  const cols=['Draft','Approved','Sent','Opened','Replied','Meeting','Sample','RFQ','Order'].map(k=>{const r=k==='Draft'?c.wait.map(b=>b.co):k==='Approved'?c.q.map(b=>b.co):hs.filter(x=>x.stage===k).map(x=>x.who),n=k==='Sent'?total-hs.length:r.length;return`<div><div class="lab">${k} <span class="pill">${n}</span></div>${r.map(x=>`<div class="kc">${esc(x)}</div>`).join('')}${k==='Sent'&&n?'<div class="kc">Earlier searches, no reply yet</div>':''}</div>`}).join('');
+ if(LIVE)return head('Pipeline')+`<div class="board">${cols}</div>`+crmCard();
  return head('Pipeline')+cTabs('pipeline')+`<div class="board">${cols}</div><div class="card" style="margin-top:16px"><div class="lab">CRM sync</div><div class="setting"><div style="flex:1"><b>HubSpot</b><p class="sub">The two-way sync is built against a HubSpot simulator. This screen doesn’t sync to a real CRM.</p></div><span class="pill acc">Coming next</span></div>${['Zoho CRM','Salesforce','Pipedrive'].map(x=>`<div class="setting"><b style="flex:1">${x}</b><span class="pill">Coming soon</span></div>`).join('')}</div>`;
 };
+const CRM_NAME={hubspot:'HubSpot',zoho:'Zoho CRM',salesforce:'Salesforce',pipedrive:'Pipedrive'};
+function crmCard(){
+ const x=L.crm,c=x?.con,on=c?.state==='connected',rows=x?.leads||[];
+ const pr=c?.providers,prov=Object.entries(pr&&!Array.isArray(pr)&&Object.keys(pr).length?pr:{hubspot:'available',zoho:'coming_soon',salesforce:'coming_soon',pipedrive:'coming_soon'});
+ const pill=(k,v)=>k!=='hubspot'?'<span class="pill">Coming soon</span>':`<span class="pill ${on?(c.simulated?'warn':'ok'):''}">${on?(c.simulated?'Simulated':'Connected'):{no_key:'Not connected',unchecked:'Not checked yet',error:'Connection error'}[c?.state]||(x?'Status unknown':'Checking')}</span>`;
+ return`<div class="card" style="margin-top:16px"><div class="lab">CRM sync</div>${x?.err?`<p class="warnc sm">${esc(x.err)}</p>`:''}${prov.map(([k,v])=>`<div class="setting"><b style="flex:1">${esc(CRM_NAME[k]||k)}</b>${pill(k,v)}</div>`).join('')}${c?.error?`<p class="warnc sm">${esc(typeof c.error==='string'?c.error:JSON.stringify(c.error))}</p>`:''}</div>
+ ${rows.length?`<div class="card flush" style="margin-top:16px"><div class="scroll"><table><tr><th>Company</th><th>Sync</th><th>Stage</th><th>Owner</th><th class="num">Amount</th></tr>${rows.map(l=>{const f=l.crm_fields||{};return`<tr><td>${esc(l.company?.name||l.company)}</td><td>${esc(l.state)}${l.error?`<span class="dom warnc">${esc(l.error)}</span>`:''}</td><td>${esc(f.stage||'—')}</td><td>${esc(f.owner||'—')}</td><td class="num">${esc(f.amount??'—')}</td></tr>`}).join('')}</table></div></div>`:''}`;
+}
+async function loadCrm(){
+ const x={};
+ try{x.con=await api('/crm/connection');x.leads=(await api('/crm/leads')).leads}catch(e){x.err='CRM status isn’t available: '+e.message}
+ L.crm=x;bg();
+}
 V.market=()=>{
  const t=head('Market','<span class="pill acc">Feature 2 · coming next</span>')+ban('','Buyer intelligence is Feature 2.','Reorder rhythm, next buying window, share of wallet and supplier switching.'+(LIVE?'':' The preview below is example data.'));
  if(LIVE)return t;
@@ -509,6 +524,7 @@ function render(){
  }
  $('.rail')&&($('.rail').scrollTop=ry);scrollTo(0,y);
  if(f&&!$('#dlg').open)document.querySelector(f)?.focus({preventScroll:true});
+ if(!LIVE)$('#tag').hidden=v==='start'&&S.mode==='product'&&!!S.req.trim()&&offTopic();
  if(v==='start')hint();clock();
 }
 function clock(){const e=$('#timer');if(!e||!S.t0)return;const s=Math.min(5999,Math.floor((Date.now()-S.t0)/1000));e.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} / 2:00`}
@@ -562,6 +578,8 @@ function reset(){closeD();clearTimeout(tt);$('#toast').hidden=true;S=fresh();edi
 const DO={
  find:async()=>{
   const v=$('#req').value.trim();
+  if(!LIVE&&S.mode==='product'){S.req=v;if(offTopic())return toResearch(v)}
+  S.needsDesk=false;
   if(LIVE){S.country=$('#country').value.trim();const b=$('[data-a=find]');b.style.width=b.offsetWidth+'px';b.textContent='…';b.disabled=true;
    const r=await api('/runs',{product:v,target_country:S.country,notes:v.slice(0,1000),do_not_contact:(S.dnc||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean)});Object.assign(S,{req:v,step:1,view:'run',picked:[],cur:null,launched:false,wait:null});Object.assign(L,{id:r.run_id,run:null,buyers:[],logs:[],calls:[],raw:'',auto:''});follow();return poll()}
   const o=S,next=fresh();Object.assign(next,{mode:o.mode,req:o.mode==='product'?v:SAMPLE,url:o.mode==='url'?v:'',list:o.mode==='list'?v:'',limit:Number(QS.get('limit'))||120,auto:o.auto,off:o.off,gmail:o.gmail,plan:o.plan,t0:Date.now()});
@@ -578,7 +596,7 @@ const DO={
  addseg:()=>{const t=$('#segname').value.trim();if(!t)return;S.custom.push({id:'c'+Date.now(),name:t,market:'new',count:0,size:'—',low:true,prop:'Saved from your sentence.',why:'Not researched in example mode.',crit:['Needs the live backend']});closeD()},
  newlist:()=>{closeD();S.mode='list';S.view='start'},
  zero:v=>{if(!S.codes.includes(v))S.codes.push(v)},
- go:v=>{if(v==='start'&&S.running){S.running=false;S.paused='stop'}railOpen=false;editing=null;S.view=v;if(v==='work'){S.seg='';S.tab='co'}scrollTo(0,0)},
+ go:v=>{if(v==='start'&&S.running){S.running=false;S.paused='stop'}railOpen=false;editing=null;S.view=v;if(LIVE&&v==='pipeline')loadCrm();if(v==='work'){S.seg='';S.tab='co'}scrollTo(0,0)},
  step:v=>{const n=+v;railOpen=false;S.view=n===1&&!LIVE&&S.step>=2?'codes':VIEW[n];S.seg='';S.tab=n===6?'dm':'co'},
  openseg:v=>{railOpen=false;Object.assign(S,{view:'work',seg:v,tab:'co',trust:'',cc:'',cur:null})},
  tab:v=>{S.tab=v;S.cur=null;editing=null},clearf:()=>Object.assign(S,{seg:'',trust:'',cc:''}),
@@ -630,7 +648,7 @@ document.addEventListener('change',e=>{
 });
 document.addEventListener('input',e=>{
  const t=e.target;
- if(t.id==='req'){if(S.mode==='list')S.list=t.value;else if(S.mode==='url')S.url=t.value;else S.req=t.value;hint();$('#est').textContent=`≈ ${estimate()} credits · ${rs(estimate())}${uncovered()?' · research mode, lower confidence':''}`;save()}
+ if(t.id==='req'){if(S.mode==='list')S.list=t.value;else if(S.mode==='url')S.url=t.value;else S.req=t.value;hint();if(!LIVE)$('#tag').hidden=S.mode==='product'&&!!S.req.trim()&&offTopic();$('#est').textContent=`≈ ${estimate()} credits · ${rs(estimate())}${uncovered()?' · research mode, lower confidence':''}`;save()}
  if(t.id==='country')S.country=t.value;if(t.id==='dnc')S.dnc=t.value;
  if(t.id==='plan'){S.plan=+t.value;const cr=Math.round(S.plan*1.15);$('#pl-rs').textContent='₹'+num(S.plan);$('#pl-cr').textContent=`≈ ${num(cr)} credits`;$('#pl-out').innerHTML=planTiles(cr);save()}
 });
@@ -675,8 +693,8 @@ function adopt(d){
    sig:cs.find(c=>c.kind==='web'||c.kind==='company_record')?.text||'',person:!!l.contact,dm:l.contact?.name||p?.to_name||'',role:l.contact?.title||p?.to_title||'',mail:l.contact?.email||'',email:em,trust,related,why:excluded||related?(excluded||related):trust==='Green'?'Import record and verified email':need||(!rec?'No import record. '+(l.match_reason||''):em==='none'?'Import record, email not checked yet':'Email not verified, held'),
    draft:!!p&&!excluded,action:a?.id,status,mailObj:p&&{to:p.to_email||'no address',subj:p.subject,body:p.body,key:p.dedupe_key,when:'Not scheduled. Approving does not send.',facts:(p.sentences||[]).filter(s=>s.claim_ids?.length).map(s=>{const c=cs.find(x=>x.id===s.claim_ids[0]);return{t:s.text,k:c?.kind==='customs'?'a':c?.kind==='seller'?'m':'b',at:String(c?.retrieved_at||'').slice(0,10)}})}}});
  const done=new Set((d.steps||[]).filter(s=>s.status==='done').map(s=>s.name||s.step)),wait=d.run.status==='awaiting_person',order=[['plan',1],['customs',3],['research',3],['shortlist',4],['select',5],['contacts',6],['write',7]];
- S.wait=wait?'select':null;S.step=wait?5:d.report?8:(order.find(([n])=>!done.has(n))?.[1]||7);S.running=!!d.running;S.paused=!d.running&&d.run.status==='failed'?'stop':null;
- const key=wait?'wait':d.report?'done':'s'+S.step;if(key!==L.auto){L.auto=key;S.view=wait?'work':d.report?'approvals':VIEW[S.step];S.tab=S.step===6?'dm':'co'}
+ const pickable=wait&&!!L.buyers.length;S.wait=pickable?'select':null;S.step=pickable?5:d.report?8:(order.find(([n])=>!done.has(n))?.[1]||7);S.running=!!d.running;S.paused=!d.running&&d.run.status==='failed'?'stop':null;
+ const key=pickable?'wait':d.report?'done':'s'+S.step;if(key!==L.auto){L.auto=key;S.view=pickable?'work':d.report?'approvals':VIEW[S.step];S.tab=S.step===6?'dm':'co'}
 }
 async function poll(){
  clearTimeout(timer);if(!L.id)return;
@@ -686,6 +704,10 @@ async function poll(){
  }catch(e){L.err=e.message;render()}
 }
 let es=null;
+async function toResearch(v){
+ try{const h=await api('/health');if(!h.ok)throw 0;sessionStorage.setItem('meridian.q',v);location.search='?live=1'}
+ catch(e){S.needsDesk=true;S.view='start'}
+}
 function follow(){
  es?.close();L.logs=[];es=new EventSource(`/api/runs/${encodeURIComponent(L.id)}/events`);
  const add=(k,t)=>{L.logs.push([k,t]);bg()};
@@ -697,7 +719,7 @@ function follow(){
 /* Presenter shortcut: ?seed=done opens a finished run. */
 if(!LIVE&&QS.get('seed')==='done'){S=fresh();S.t0=Date.now();enter(1);for(let i=0;i<200&&S.step<8;i++){if(S.wait==='codes')enter(3);else if(S.wait==='segs')enter(5);else{const o=ops(S.step).find(x=>!S.done[x.k]);if(!o){if(S.step===2){S.wait='codes'}else if(S.step===4){S.wait='segs'}else if(S.step===7){S.step=8;S.running=false}else enter(S.step+1)}else{S.credits+=o.cr;led(o.ep,o.cr,'ok',o.k);S.done[o.k]=1;logL(o.say)}}}S.launched=true;S.view='today';save();QS.delete('seed');history.replaceState(null,'',location.pathname+(QS.size?'?'+QS:''))}
 if(LIVE){
- $('#tag').textContent='LIVE API · local';S.req='';
+ $('#tag').hidden=true;S.req='';try{const q=sessionStorage.getItem('meridian.q');if(q){sessionStorage.removeItem('meridian.q');S.req=q;setTimeout(()=>{render();$('[data-a=find]')?.click()},300)}}catch(e){}
  api('/runs').then(r=>{L.runs=r;const id=QS.get('run');if(id&&r.some(x=>x.id===id)){L.id=id;follow();poll()}else render()}).catch(e=>{L.err='No backend here. Serve this file from the tradescout server. '+e.message;render()});
 }else setInterval(tick,750);
 setInterval(clock,1000);render();
