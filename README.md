@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 5:37 PM IST on 22 November 2026, at commit [`ce5b5f0`](https://github.com/shivanshpilani/tradescout/commit/ce5b5f0).
+Every capability in this document carries one of these labels. Status is as of 5:48 PM IST on 22 November 2026, at commit [`a5bbb1d`](https://github.com/shivanshpilani/tradescout/commit/a5bbb1d).
 
 | Label | Meaning |
 |---|---|
@@ -20,9 +20,9 @@ Every capability in this document carries one of these labels. Status is as of 5
 | **Built, tested offline** | The code is on this branch and its tests pass. We are not claiming a live run of that specific case. |
 | **Built, simulated** | The code works against a fake version of the outside service. It has not touched the real one. |
 | **Being built** | In progress or on another branch. It is not part of this branch's product yet. |
-| **Roadmap** | Not built. |
+| **Roadmap** or **Coming soon** | Not built. |
 
-In short: **the agents, Crustdata, the customs-file route, the ledger and the caps are live. CRM sync is simulated. Outreach and the redesigned interface are being built. Buyer intelligence is Feature 2.**
+In short: **the agents, Crustdata, the customs-file route, the ledger and the caps are live. CRM sync and outreach are built and tested on simulators, with no real send claimed. The redesigned interface is being built. Other CRMs are coming soon. Buyer intelligence is Feature 2.**
 
 ---
 
@@ -102,7 +102,7 @@ The figures are from Meridian's [published case study](https://meridian.asterhir
 
 ### The business case
 
-The exporter buys an **end-to-end distribution service**: from a product to researched buyers, the right person, approved outreach, follow-up and a handover when a buyer responds. What the software automates today ends at the approved draft. Outreach is being built, and [section 2](#2-what-it-does-now) marks exactly where that line sits.
+The exporter buys an **end-to-end distribution service**: from a product to researched buyers, the right person, approved outreach, follow-up and a handover when a buyer responds. What ran live today ends at the approved draft. Outreach is built and has run only against a simulated mailbox, and [section 2](#2-what-it-does-now) marks exactly where that line sits.
 
 **What one research job costs to run**
 
@@ -140,8 +140,9 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Swappable customs source | **Built** | Only the file adapter exists. No vendor API is connected. |
 | Local API, event stream and minimal interface | **Built** | Start, watch, select and approve from a browser |
 | Two-way CRM sync with HubSpot | **Built, simulated** | Never run against a real HubSpot account |
-| Zoho CRM | **Being built** | A stub on this branch |
-| Gmail outreach, follow-ups, reply triage and alerts | **Being built** | On `feat/outreach`, with simulated-mailbox tests. Not wired into this branch. |
+| Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | HubSpot comes first |
+| Gmail outreach, follow-ups, reply triage and alerts | **Built, simulated** | Wired into this branch and tested on a simulated mailbox. It can email only listed team test inboxes. No real send is claimed. |
+| Exclude the exporter's existing buyers, rank related parties last | **Built, tested offline** | Needs the exporter's company name in the brief |
 | Redesigned "Agent rail" interface | **Being built** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
 | Buyer intelligence | **Roadmap: Feature 2** | Shown as coming next |
 | Automated named-company route | **Roadmap** | Sold manually today |
@@ -193,20 +194,19 @@ The menthol runs also exposed real weaknesses:
 |---|---|
 | On the first attempt none of five importer names matched a company record | Better search per name. The match rate is still only one to two of five. |
 | An importer matched a consumer brand with the same name, and a draft was written to the wrong company's contact | The identity critic in `ce5b5f0` rejected that match in a later live run. The wrong draft must not be approved. |
-| An importer that already buys from the seller was proposed as a new prospect | A fix is being built. Until then, the seller must put existing buyers on the don't-contact list. |
-| US subsidiaries importing from their own Indian parent ranked as top buyers | A related-party flag and lower rank are being built. Until then, a person must check the supplier. |
+| An importer that already buys from the seller was proposed as a new prospect | Fixed in code and tested: give your company name and those importers are removed. Not yet claimed on a live re-run. |
+| US subsidiaries importing from their own Indian parent ranked as top buyers | Fixed in code and tested: flagged, and ranked last when most records come from the related supplier. The name rule can miss differently named parents. |
 
 ### How we tested it
 
-On a fresh clone at `ce5b5f0`, with Node 22.14:
+On a fresh clone at `a5bbb1d`, with Node 22.14:
 
-- **109 automated tests in seven files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list and CRM sync.
-- **As shipped, 108 of 109 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 109 of 109 pass. The [run instructions](#tests) cover the real file.
+- **156 automated tests in eight files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, CRM sync and outreach.
+- **As shipped, 155 of 156 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 156 of 156 pass. The [run instructions](#tests) cover the real file.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
 - **The API returns 403 to a request from another web origin.**
-- **On `feat/outreach`, that module's 44 tests pass.**
 
 The tests use stubs for paid services. The live runs above are separate evidence. Some pipeline crash tests exercise the earlier pipeline on the same runner. We don't yet have a labelled evaluation set, so **we make no accuracy percentage claim**.
 
@@ -228,8 +228,8 @@ The tests use stubs for paid services. The live runs above are separate evidence
 | Model returns invalid JSON | One correction attempt, then failure | In code |
 | Draft cites an unknown claim, adds a number, leaks import data or leaves a placeholder | Sent back, then blocked | Tested |
 | Existing customer or distributor, when listed | Removed by name or domain | Tested |
-| Existing customer that wasn't listed | Can still be proposed | Known gap, being fixed |
-| Importer buying from its own parent company | Can still rank high | Known gap, being fixed |
+| Existing customer that wasn't listed | Removed when the records show the exporter as its supplier and the brief names the exporter | Tested. Otherwise it can still be proposed. |
+| Importer buying from its own parent company | Flagged, and ranked last when that is most of its records | Tested. Name-based, so imperfect. |
 | A company with the same name as the importer | The identity critic picks none when in doubt | Live |
 | Process dies mid-run | Resumes from the last checkpoint | Live |
 | Two processes resume one run | Only one can work and pay | Tested |
@@ -248,7 +248,7 @@ The tests use stubs for paid services. The live runs above are separate evidence
 - Approving every draft, then adding the sender's name and company.
 - Reconciling any action with an unknown outcome.
 - Price, samples, payment terms and contracts. Agents don't handle these.
-- Sending. This branch does not send email.
+- Sending. By default an approved draft becomes a file. In test mode it can be emailed only to a listed team inbox.
 
 ---
 
@@ -258,14 +258,13 @@ The tests use stubs for paid services. The live runs above are separate evidence
 
 | Work | State at this snapshot | It counts as done when |
 |---|---|---|
-| Existing-buyer exclusion and related-party ranking | In progress | Neither appears as a top new prospect on the menthol run |
+| Existing-buyer exclusion and related-party ranking | In code and tested offline | Neither appears as a top new prospect on the menthol run |
 | Importer match rate | One to two of five | Measured on a labelled set, with no wrong matches |
-| Outreach from the client's Gmail | Module on its own branch. Mailbox sign-in is being verified. No send is claimed. | One approved email reaches a team test inbox once and its reply is classified |
+| Outreach from the client's Gmail | Wired and simulated. A team mailbox has signed in. No send is claimed. | One approved email reaches a team test inbox once and its reply is classified |
 | HubSpot against a real account | Simulated. Waiting on a service key. | A double push creates no duplicate and a stage change comes back |
-| Zoho adapter | Stub here, adapter in progress | The same tests pass, then a real-account check |
 | Agent rail interface | First draft of the screens | Connected to this API and tested at projector size |
 
-**Outreach, as designed on its branch:** Gmail sign-in, SPF, DKIM and DMARC checks, a daily ramp of 10, 20, 30 and then 40 emails, a reply and bounce check before every send, follow-ups on days 3, 7 and 14, reply classification, and escalation. It has an approval mode and a bounded auto mode. Bookings and answers always go to a person, and it can email only an explicit list of team test inboxes today.
+**Outreach, as built and simulated:** Gmail sign-in, SPF, DKIM and DMARC checks, a daily ramp of 10, 20, 30 and then 40 emails, a reply and bounce check before every send, follow-ups on days 3, 7 and 14, reply classification, and escalation. It has an approval mode and a bounded auto mode for follow-ups. Bookings and answers always go to a person, and it can email only an explicit list of team test inboxes today.
 
 ### Feature 2: buyer intelligence
 
@@ -287,7 +286,7 @@ Each phase opens on evidence, not on a date.
 |---|---|---|
 | 1. Paid research | "Companies you name" route, a product master (grade, use, certificates, minimum order), and a labelled evaluation set of 30 companies | Five paid jobs, with 90% of companies accepted as right fit |
 | 2. Customs and buyer intelligence | A vendor API behind the existing adapter, detailed product reports, stronger company matching, Feature 2 | Two clients use it |
-| 3. CRM | HubSpot live, then Zoho, Salesforce and Pipedrive | 14 days with no duplicate or echo loop |
+| 3. CRM | HubSpot live. Zoho, Salesforce, Pipedrive and others are coming soon. | 14 days with no duplicate or echo loop |
 | 4. Managed outreach | Sequences, independent email verification, reply handling, booking, per-country send policy | Three clients, zero duplicate sends, every stop honoured |
 | 5. Bounded full auto | A signed campaign policy (markets, cap, template, fit floor, expiry), shadow mode and a kill switch | 200 shadow decisions with no critical error |
 | 6. Scale | Postgres, queues, client login and isolation, tracing, billing | Repeat purchases justify it |
@@ -312,47 +311,93 @@ The customer journey continues past a meeting: **meeting, sample, RFQ, order**. 
 
 ## 4. How it runs
 
-### Architecture
+### System architecture
 
 Code runs the process. Agents reason inside a step and propose. Code checks, records, spends and commits.
 
 ```mermaid
-flowchart TD
-  U["Exporter: product, HSN, country, don't-contact list"] --> P["Planner agent<br/>code checks every HS code"]
-  P --> C["Customs adapter<br/>local export files"]
-  C --> M["Customs matcher<br/>redacted descriptions"]
-  C -->|no records| R
-  M -->|fewer than 3 exact importers| R["Researcher agent<br/>Crustdata tools"]
-  R --> K{"Evidence checks:<br/>code, then critic"}
-  K -->|one send-back| R
-  K --> S["Ranked shortlist"]
-  M --> S
-  S --> H1{{"Person selects 1 to 5"}}
-  H1 --> I{"Identity critic:<br/>right company?"}
-  I -->|unsure| Q["Left for a person"]
-  I -->|confirmed| E["Crustdata: company, decision-maker, work email"]
-  E --> W["Copywriter agent"]
-  W --> D{"Draft checks:<br/>code, then critic"}
-  D -->|one rewrite| W
-  D -->|fails twice| B["Blocked for a person"]
-  D -->|passes| H2{{"Person approves exact text"}}
-  H2 --> X["Test outbox: one .eml file"]
-  E -.->|simulated today| CRM["CRM sync"]
-  X -.->|being built| O["Gmail outreach"]
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":26,"rankSpacing":38,"curve":"basis"}}}%%
+flowchart TB
+  subgraph PEOPLE["Person"]
+    UI["Exporter's desk<br/>brief · select · approve"]:::human
+  end
+  subgraph CORE["Meridian: code runs the process"]
+    API["Local API<br/>and event stream"]:::live
+    ORCH["Orchestrator<br/>8 checkpointed steps"]:::live
+    AG["Agents propose<br/>code checks"]:::live
+    GATE{"Spend gate<br/>ctx.call"}:::live
+    DB[("SQLite ledger<br/>steps · calls · actions")]:::live
+  end
+  subgraph DATA["Data and models"]
+    CU["Customs<br/>export files"]:::live
+    CD["Crustdata<br/>companies · people · web"]:::live
+    GM["Gemini<br/>all agents"]:::live
+  end
+  subgraph OUT["After approval or selection"]
+    BOX["Test outbox<br/>writes one file"]:::tested
+    CRM["CRM sync<br/>simulated"]:::sim
+    MAIL["Gmail outreach<br/>simulated"]:::sim
+  end
+  UI --> API --> ORCH
+  ORCH --> AG --> GATE
+  ORCH --> DB
+  GATE --> DB
+  GATE --> CU & CD & GM
+  DB --> BOX
+  DB -.-> CRM
+  DB -.-> MAIL
+  classDef live fill:#d4efe1,stroke:#1e8a5a,stroke-width:2px,color:#0b2a1c
+  classDef tested fill:#dbe7fb,stroke:#2f6fd0,stroke-width:2px,color:#0c2147
+  classDef sim fill:#eee3fa,stroke:#7c4bc0,stroke-width:2px,color:#2a1446
+  classDef human fill:#fde0d5,stroke:#d0542a,stroke-width:3px,color:#3d1405
 ```
 
-Every external call in this flow goes through one gate, `ctx.call`, backed by the SQLite ledger:
+Green is live, blue is tested offline, purple is simulated, and orange is a person. Every paid call holds its worst-case cost in the ledger before it starts.
+
+### Agent orchestration
+
+Purple is an agent, always paired with checks in code. Green is plain code. Orange is a decision only a person makes. Dotted arrows are the bounded retries.
 
 ```mermaid
-flowchart LR
-  S["Pipeline step"] --> G["ctx.call"]
-  G --> M{"Same call already<br/>saved in this run?"}
-  M -->|yes| R["Reuse it: no charge"]
-  M -->|no| B{"Worst-case cost<br/>fits run and day caps?"}
-  B -->|no| X["Refuse the call"]
-  B -->|yes| H["Hold the cost"] --> A["Call the service"]
-  A -->|known charge| L["Settle and record"]
-  A -->|unknown charge| U["Keep the hold"]
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":24,"rankSpacing":30,"curve":"basis"}}}%%
+flowchart TB
+  IN["Product · HSN · country"]:::human
+  subgraph FIND["1 · Find and prove"]
+    PL["Planner<br/>expands HS codes"]:::agent
+    CQ["Customs query"]:::code
+    MA["Matcher<br/>exact product?"]:::agent
+    RE["Researcher<br/>Crustdata tools"]:::agent
+    EC{"Quote check,<br/>then critic"}:::agent
+    SL["Ranked shortlist"]:::code
+  end
+  PICK{{"Person selects 1 to 5"}}:::human
+  subgraph REACH["2 · Reach the right person"]
+    IC{"Identity critic"}:::agent
+    EN["Person and<br/>work email"]:::code
+    CW["Copywriter"]:::agent
+    DC{"Fact check,<br/>then critic"}:::agent
+  end
+  NP["Needs a person"]:::stop
+  OK{{"Person approves"}}:::human
+  OB["One file in<br/>test outbox"]:::code
+  IN --> PL --> CQ
+  CQ -->|records| MA
+  CQ -->|none| RE
+  MA -->|under 3 proven| RE
+  RE --> EC
+  EC -.->|retry once| RE
+  EC --> SL
+  MA --> SL
+  SL --> PICK --> IC
+  IC -->|confirmed| EN --> CW --> DC
+  IC -->|unsure| NP
+  DC -.->|rewrite once| CW
+  DC -->|fails twice| NP
+  DC -->|passes| OK --> OB
+  classDef agent fill:#eee3fa,stroke:#7c4bc0,stroke-width:2px,color:#2a1446
+  classDef code fill:#d4efe1,stroke:#1e8a5a,stroke-width:2px,color:#0b2a1c
+  classDef human fill:#fde0d5,stroke:#d0542a,stroke-width:3px,color:#3d1405
+  classDef stop fill:#eef1f4,stroke:#64748b,stroke-width:2px,color:#26313d
 ```
 
 ### The eight pipeline steps
@@ -369,6 +414,44 @@ Each step is a checkpoint in the ledger.
 | `contacts` | Identity critic, then code | Crustdata, Gemini | Doubt is recorded as "needs a person" |
 | `write` | Copywriter and draft critic. Code checks first. | Gemini | Two failures block the draft |
 | `report` | Code | None | Resumes from the checkpoint |
+
+### One lead's life
+
+A lead can always stop for a person, and an unclear outcome is never retried blindly. The amber states after the test outbox are outreach and CRM stages. They are simulated or set by a person, and have not been reached live by this software.
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","edgeLabelBackground":"#ffffff"}}}%%
+stateDiagram-v2
+  direction TB
+  state "Needs a person" as review
+  state "Approved" as approved
+  state "Outcome unknown" as unknown
+  state "Written to test outbox" as done
+  state "Contacted" as contacted
+  state "Meeting" as meeting
+  state "Sample, RFQ, order" as order
+  [*] --> shortlisted
+  shortlisted --> selected: person picks
+  selected --> drafted: checks pass
+  selected --> review: any doubt
+  drafted --> rejected: person says no
+  drafted --> approved: person says yes
+  approved --> executing: one worker
+  executing --> done: confirmed
+  executing --> unknown: crash or timeout
+  unknown --> approved: person: not done
+  unknown --> done: person: done
+  done --> contacted: simulated
+  contacted --> replied
+  replied --> meeting
+  meeting --> order
+  classDef now fill:#d4efe1,stroke:#1e8a5a,stroke-width:2px,color:#0b2a1c
+  classDef gate fill:#fde0d5,stroke:#d0542a,stroke-width:2px,color:#3d1405
+  classDef next fill:#fbecd0,stroke:#c98a12,stroke-width:2px,color:#3a2604
+  class shortlisted,selected,drafted,executing,done now
+  class approved,rejected,review,unknown gate
+  class contacted,replied,meeting,order next
+```
 
 ### The agents
 
@@ -408,7 +491,40 @@ Crustdata is the discovery, identity, people and live-web layer. Shipment proof 
 
 Only the operator sets these. A request or a model cannot raise them. A model with no listed price is refused. The caps count calls made by this app, not other uses of the same keys. `RUN_TIME_LIMIT_MS` also caps active time per attempt.
 
-### Exactly once, stated precisely
+### Crash, resume and exactly once
+
+```mermaid
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","actorBkg":"#d4efe1","actorBorder":"#1e8a5a","actorTextColor":"#0b2a1c","noteBkgColor":"#fbecd0","noteBorderColor":"#c98a12","noteTextColor":"#3a2604","signalColor":"#64748b","signalTextColor":"#334155","labelBoxBkgColor":"#f8fafc"},"sequence":{"width":118,"actorMargin":34,"messageMargin":26,"mirrorActors":false,"wrap":true}}}%%
+sequenceDiagram
+  participant P as Person
+  participant R as Runner
+  participant L as Ledger
+  participant S as Service
+  rect rgba(47,111,208,0.10)
+    Note over P,S: Pay once
+    R->>L: Hold worst-case cost
+    R->>S: Paid call
+    S-->>R: Result and charge
+    R->>L: Save both
+    Note over R: Process is killed
+    P->>R: Resume
+    R->>L: Take lease
+    L-->>R: Saved result
+    Note over R,S: No second charge
+  end
+  rect rgba(208,84,42,0.10)
+    Note over P,S: Act once
+    P->>L: Approve exact text
+    R->>L: Claim action
+    Note over L: One worker can win
+    R->>S: Execute
+    Note over R,S: Crash before reply
+    R->>L: Mark unknown
+    Note over L: Never retried blindly
+    L-->>P: Ask: did it happen?
+    P->>L: Done, or not done
+  end
+```
 
 - A finished step is never run again on resume. An identical saved call inside a run is reused.
 - One run lease means two resumes can't both work.
@@ -445,7 +561,7 @@ The importer accepts export reports and US import manifests in `.xlsx`. It write
 ```bash
 npx tsx src/cli.ts check     # free: credits and endpoint access
 npx tsx src/cli.ts run --product "natural menthol crystals" --country "USA" --hs 290611 \
-  --notes "What you make and can truthfully offer" --exclude "Existing Distributor Inc"
+  --notes "What you make and can truthfully offer" --client "Your Company Name" --exclude "Existing Distributor Inc"
 npx tsx src/cli.ts select <run-id> 1 2 3
 npx tsx src/cli.ts approve <action-id>
 npx tsx src/cli.ts execute <action-id>    # writes data/out/*.eml and sends nothing
@@ -461,6 +577,14 @@ npx tsx src/cli.ts resume <run-id>
 npx tsx src/cli.ts ledger <run-id>        # the calls made before the kill are not charged again
 npx tsx src/cli.ts reconcile <action-id> done   # or not-done, for an unknown outcome
 ```
+
+**See outreach on a simulated mailbox (nothing is emailed)**
+
+```bash
+npx tsx src/outreach/server.ts --simulate    # http://127.0.0.1:8789/outreach
+```
+
+Setup for the team test inboxes is in [`docs/outreach.md`](https://github.com/shivanshpilani/tradescout/blob/pivot/agentic-buyer-desk/docs/outreach.md). Without `OUTREACH_TEST_RECIPIENTS`, the main app only writes files.
 
 **See CRM sync on the simulator (no key)**
 
@@ -492,7 +616,8 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 | `src/ledger/`, `src/runner/`, `src/core/limits.ts` | Checkpoints, calls, actions, leases and caps |
 | `src/actions/execute.ts` | The test-outbox executor |
 | `src/api/`, `public/` | Local API, event stream and minimal interface |
-| `src/crm/` | CRM engine, HubSpot adapter, simulator and Zoho stub |
+| `src/outreach/` | Gmail, domain checks, follow-ups, reply triage, alerts and mailbox simulator |
+| `src/crm/` | CRM engine, HubSpot adapter and simulator, plus a placeholder for other CRMs |
 | [`docs/api.md`](https://github.com/shivanshpilani/tradescout/blob/pivot/agentic-buyer-desk/docs/api.md) | API and event contract |
 | `src/pipeline.ts`, `src/steps/`, `src/layers/`, `src/scoring/` | The earlier TradeScout product, kept for its tests and shared helpers |
 | `docs/architecture.md`, `docs/submission.md`, `docs/test-cases.md`, `docs/context.md` | These describe the earlier product. This README supersedes them. |
@@ -502,6 +627,7 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 - **What stays local:** shipment files, the SQLite ledger, drafts and `.env`. All are git-ignored.
 - **What goes to Gemini:** product and plan, redacted shipment descriptions, public web text, company names, records and descriptions, job titles and claims. The app doesn't add contact names, email addresses or customs figures. Redaction follows rules, so an unusual name inside a free-text description could get through, and a public page can itself contain a name.
 - **What goes to Crustdata:** search words, the names of selected importers to resolve, company IDs and, for work emails, professional profile URLs.
+- **If outreach is connected:** the Gmail token is encrypted and stored outside the repository. Known names, contact details and amounts are redacted from replies before a model call.
 - **Personal data:** name, title, employer and work email, only for selected companies. No phone numbers.
 - **Buyer-facing text:** customs figures are marked internal, and draft checks block wording that reveals trade data.
 - **Network:** the API listens on `127.0.0.1` and rejects other hosts and origins. It has no login, so don't expose it.
@@ -570,7 +696,7 @@ In Meridian's earlier export samples, about 30% of descriptions were blank or "O
 - The approval API was open to the venue network. It is now local only.
 - A company's own description can make a category look like proof. Labels, quote checks and the critic exist because of this.
 - A menthol run matched a same-named company and drafted to the wrong person. The identity critic fixes that known case.
-- The menthol shortlist proposed an existing buyer and ranked importers that buy from their own parent. Those fixes are in progress.
+- The menthol shortlist proposed an existing buyer and ranked importers that buy from their own parent. Both now have tested rules.
 
 ### What existed before today
 
@@ -622,7 +748,7 @@ We use a model where the work needs judgement over messy language, and code wher
 
 **A ledger instead of an agent framework.** We needed five things: checkpoints, a call cache, cost holds, leases and guarded actions. SQLite gives us all five in a small codebase that runs on a laptop, and a judge can inspect every call. The cost is that it runs on one machine until we move to Postgres and queues.
 
-**One contract for the modules.** CRM, outreach and the interface all consume the same `Lead`, `Claim` and `OutreachDraft`. That let us build them in parallel and label each honestly. The cost is that a module can pass its own tests and still not be integrated, which is outreach's state today.
+**One contract for the modules.** CRM, outreach and the interface all consume the same `Lead`, `Claim` and `OutreachDraft`. That let us build them in parallel and label each honestly. The cost is that a module can pass its own tests and still not be integrated, as outreach was until 5:40 PM. Even now it is integrated without being proven live.
 
 **Adapters at paid boundaries.** Customs vendors and CRMs will differ by customer. Agents see one shape. The cost is that only the file source and a simulated HubSpot have been exercised.
 
