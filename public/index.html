@@ -1,1 +1,101 @@
-<!doctype html><title>TradeScout</title><p>Frontend coming soon. API at /api/health</p>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TradeScout desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="masthead">
+  <h1>TradeScout</h1>
+  <p class="tag">An export sourcing desk. Product and market in; vetted counterparties, the right buyer and a draft out. Every line carries its source.</p>
+  <div class="masthead-right"><span id="api-state" class="pill">connecting</span></div>
+</header>
+
+<main class="desk">
+  <aside class="intake">
+    <form id="request-form">
+      <h2>New request</h2>
+      <label>What do you export?<input name="product" required placeholder="industrial textiles" autocomplete="off"></label>
+      <label>Which market?<input name="target_country" required placeholder="Germany, DEU, the UAE" autocomplete="off"></label>
+      <div class="two">
+        <label>Min staff<input name="min_headcount" type="number" value="20" min="1"></label>
+        <label>Max staff<input name="max_headcount" type="number" value="2000" min="1"></label>
+      </div>
+      <button type="submit" class="primary">Run the desk</button>
+      <p class="hint">About 20 to 30 Crustdata credits per run. Nothing is sent to anyone; drafts wait for your approval.</p>
+    </form>
+    <section class="runs">
+      <h2>Runs</h2>
+      <ul id="run-list"></ul>
+    </section>
+  </aside>
+
+  <section class="sheet" id="sheet" hidden>
+    <div class="sheet-head">
+      <div>
+        <p class="request-line" id="request-line"></p>
+        <p class="resolved" id="resolved"></p>
+      </div>
+      <div class="controls">
+        <span id="run-status" class="pill"></span>
+        <button id="resume-btn" class="ghost" hidden>Resume run</button>
+        <button id="rerun-btn" class="ghost" hidden>Run again (diff)</button>
+      </div>
+    </div>
+
+    <ol class="steps" id="steps"></ol>
+
+    <div class="columns">
+      <div class="main">
+        <section id="layers" class="layers"></section>
+        <section>
+          <h2 id="shortlist-title">Shortlist</h2>
+          <div id="shortlist"></div>
+        </section>
+        <section id="needs-person" class="needs-person"></section>
+      </div>
+      <aside class="rail">
+        <section class="ledger">
+          <h2>Run ledger</h2>
+          <dl id="ledger"></dl>
+          <details><summary>Every call</summary><table id="calls"></table></details>
+        </section>
+        <section class="actions">
+          <h2>Awaiting your approval</h2>
+          <div id="actions"></div>
+        </section>
+        <section class="monitor" id="monitor"></section>
+      </aside>
+    </div>
+  </section>
+
+  <section class="empty" id="empty">
+    <h2>Pick a run on the left, or start one.</h2>
+    <p>The desk works in seven steps: read the request, find counterparties, vet them, read buying signals, find the buyer, draft the first note, and write the report. Each step is a checkpoint; kill the process at any point and resume it, and nothing is paid or proposed twice.</p>
+  </section>
+</main>
+
+<template id="candidate-row">
+  <article class="row">
+    <div class="rank"></div>
+    <div class="who">
+      <h3 class="name"></h3>
+      <p class="meta"></p>
+      <p class="why"></p>
+      <p class="contact"></p>
+      <details class="evidence"><summary></summary><ul></ul></details>
+    </div>
+    <div class="scores">
+      <div class="stamp"></div>
+      <div class="fit"><span class="bar"><i></i></span><span class="num"></span></div>
+      <p class="intent"></p>
+    </div>
+  </article>
+</template>
+<script src="/app.js"></script>
+</body>
+</html>

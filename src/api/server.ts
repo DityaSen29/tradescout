@@ -65,8 +65,14 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
       res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", "access-control-allow-origin": "*" });
-      const unsub = subscribe(id, (e) => { res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); if (e.type === "done" || e.type === "error") { res.end(); unsub(); } });
-      req.on("close", unsub); return;
+      let closed = false; let unsub: () => void = () => {};
+      const listener = (e: any) => {
+        if (closed) return;
+        try { res.write(`id: ${e.seq}\nevent: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`); } catch { closed = true; return; }
+        if (e.type === "done" || e.type === "error") { closed = true; res.end(); queueMicrotask(() => unsub()); }
+      };
+      unsub = subscribe(id, listener);          // replays history synchronously; a finished run ends the stream here
+      req.on("close", () => { closed = true; unsub(); }); return;
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/resume$/)) && m === "POST") { const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" }); start(id, "resume"); return json(res, 202, { run_id: id, resumed: true }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "search", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "search" }); }
@@ -85,6 +91,11 @@ const server = createServer(async (req, res) => {
       if (file.startsWith("public") && existsSync(file)) { res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" }); return res.end(readFileSync(file)); }
     }
     json(res, 404, { error: "not found" });
-  } catch (err: any) { json(res, err?.name === "ZodError" ? 400 : 500, { error: String(err?.message ?? err) }); }
+  } catch (err: any) {
+    if (res.headersSent) { try { res.end(); } catch { /* already closed */ } return; }
+    json(res, err?.name === "ZodError" ? 400 : 500, { error: String(err?.message ?? err) });
+  }
 });
+process.on("uncaughtException", (e) => console.error("uncaught:", e));
+process.on("unhandledRejection", (e) => console.error("unhandled:", e));
 server.listen(PORT, () => console.log(`TradeScout API on http://localhost:${PORT}`));
