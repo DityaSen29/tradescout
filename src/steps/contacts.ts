@@ -1,6 +1,7 @@
 import type { StepCtx } from "../runner/pipeline.js";
 import { and, f, or, flattenPerson } from "../sources/crustdata.js";
 import { crust, apiEvidence, BUYING_TITLE, iso3Of } from "./common.js";
+import { MAX_CREDITS } from "../core/limits.js";
 import type { VetOutput } from "./vet.js";
 
 /**
@@ -14,7 +15,7 @@ export async function contactsStep(ctx: StepCtx): Promise<{ found: number; notes
   const notes: string[] = [];
   if (!ids.length) return { found: 0, notes: ["no vetted candidates to contact"] };
   const fields = ["basic_profile.name", "basic_profile.headline", "basic_profile.location.country", "basic_profile.professional_network_name", "experience.employment_details.current.title", "experience.employment_details.current.name", "experience.employment_details.current.crustdata_company_id", "experience.employment_details.current.seniority_level"];
-  const r = await ctx.call({ source: "crustdata", endpoint: "/person/search", request: { ids, fields, limit: 15 }, credits: (x: any) => x.credits }, async () => {
+  const r = await ctx.call({ source: "crustdata", endpoint: "/person/search", request: { ids, fields, limit: 15 }, maxUnits: MAX_CREDITS.personSearch(15), credits: (x: any) => x.credits }, async () => {
     const x = await crust().personSearch({
       filters: and(f("experience.employment_details.current.company_id", "in", ids), or(
         f("experience.employment_details.current.title", "(.)", "procurement purchasing sourcing buyer supply chain category import"),

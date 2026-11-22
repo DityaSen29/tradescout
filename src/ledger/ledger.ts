@@ -4,6 +4,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Evidence, ProposedAction, TradeRequest } from "../core/types.js";
 import { BudgetExceeded } from "../core/types.js";
+import { budgetDay, envLimit, limitFor, PAID_PROVIDERS, type PaidProvider } from "../core/limits.js";
 
 /**
  * The run ledger. One sqlite file holds every run, every step, every call with its cost,
@@ -11,7 +12,7 @@ import { BudgetExceeded } from "../core/types.js";
  * action with the same idempotency key can only execute once.
  */
 export interface RunRow {
-  id: string; request: TradeRequest; status: "running" | "done" | "failed" | "budget_exceeded";
+  id: string; request: TradeRequest; status: "running" | "done" | "failed" | "budget_exceeded" | "awaiting_person";
   created_at: string; updated_at: string; time_limit_ms: number; credit_limit: number;
 }
 export interface CallMeta {
@@ -25,12 +26,22 @@ export interface CallRow extends CallMeta {
 export const now = () => new Date().toISOString();
 export const hashOf = (v: unknown) => createHash("sha256").update(JSON.stringify(v)).digest("hex").slice(0, 32);
 
+/** Owner tokens held by this process, so a reused pid after a restart is not mistaken for a live owner. */
+const ownTokens = new Set<string>();
+const newOwner = () => { const token = `${process.pid}:${randomUUID()}`; ownTokens.add(token); return token; };
+function ownerAlive(owner: string): boolean {
+  const pid = Number(owner.split(":")[0]);
+  if (pid === process.pid) return ownTokens.has(owner);
+  try { process.kill(pid, 0); return true; } catch (err: any) { return err.code === "EPERM"; }
+}
+
 export class Ledger {
   readonly db: DatabaseSync;
   constructor(path = process.env.TRADESCOUT_DB ?? "data/tradescout.db") {
     if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
     this.db = new DatabaseSync(path);
     this.db.exec(`
+      PRAGMA busy_timeout = 5000;
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY, request_json TEXT NOT NULL, status TEXT NOT NULL,
@@ -50,10 +61,23 @@ export class Ledger {
       CREATE TABLE IF NOT EXISTS actions (
         id TEXT PRIMARY KEY, run_id TEXT NOT NULL, kind TEXT NOT NULL, idempotency_key TEXT NOT NULL UNIQUE,
         status TEXT NOT NULL, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, executed_at TEXT, result_json TEXT);
+      CREATE TABLE IF NOT EXISTS spend (
+        id TEXT PRIMARY KEY, run_id TEXT NOT NULL, provider TEXT NOT NULL, day TEXT NOT NULL,
+        units REAL NOT NULL, state TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS spend_provider_day ON spend(provider, day);
+      CREATE TABLE IF NOT EXISTS controls (name TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS selections (run_id TEXT PRIMARY KEY, lead_ids TEXT NOT NULL, at TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS run_leases (run_id TEXT PRIMARY KEY, owner TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS snapshots (
         run_id TEXT NOT NULL, request_hash TEXT NOT NULL, taken_at TEXT NOT NULL, report_json TEXT NOT NULL);
     `);
     try { this.db.exec(`ALTER TABLE runs ADD COLUMN clock_started_at TEXT`); } catch { /* column exists */ }
+    try { this.db.exec(`ALTER TABLE actions ADD COLUMN executor TEXT`); } catch { /* column exists */ }
+  }
+
+  private atomic<T>(fn: () => T): T {
+    this.db.exec("BEGIN IMMEDIATE");
+    try { const out = fn(); this.db.exec("COMMIT"); return out; } catch (err) { this.db.exec("ROLLBACK"); throw err; }
   }
 
   // ---- runs -------------------------------------------------------------
@@ -62,8 +86,8 @@ export class Ledger {
     const t = now();
     this.db.prepare(`INSERT INTO runs (id, request_json, status, created_at, updated_at, time_limit_ms, credit_limit, clock_started_at) VALUES (?,?,?,?,?,?,?,?)`).run(
       id, JSON.stringify(request), "running", t, t,
-      limits?.time_limit_ms ?? Number(process.env.RUN_TIME_LIMIT_MS ?? 240000),
-      limits?.credit_limit ?? Number(process.env.RUN_CREDIT_LIMIT ?? 60), t);
+      limits?.time_limit_ms ?? envLimit("RUN_TIME_LIMIT_MS", 300000),
+      limits?.credit_limit ?? limitFor("crustdata", "run"), t);
     return id;
   }
   getRun(id: string): RunRow | null {
@@ -99,6 +123,8 @@ export class Ledger {
   }
   /** Forget checkpoints from `name` onward so they re-run; memoised calls stay, so nothing is paid twice. */
   resetStepsFrom(runId: string, name: string, order: string[]) {
+    const held = this.db.prepare(`SELECT owner FROM run_leases WHERE run_id=?`).get(runId) as any;
+    if (held && ownerAlive(held.owner)) throw new Error(`run ${runId} is already running`);
     const idx = order.indexOf(name); if (idx < 0) throw new Error(`unknown step ${name}`);
     for (const n of order.slice(idx)) this.db.prepare(`DELETE FROM steps WHERE run_id=? AND name=?`).run(runId, n);
     this.db.prepare(`DELETE FROM actions WHERE run_id=? AND status='proposed'`).run(runId); // un-decided proposals are re-derived; decided ones stay
@@ -137,6 +163,67 @@ export class Ledger {
     if (t.credits_used > run.credit_limit) throw new BudgetExceeded("credits", `run ${runId} used ${t.credits_used} of ${run.credit_limit} credits`);
   }
 
+  // ---- hard API limits ---------------------------------------------------
+  /**
+   * Hold the worst-case cost before a paid call, in one write transaction so concurrent runs share the caps.
+   * A hold that is never settled (crash, timeout) keeps counting: an unknown charge is treated as spent.
+   */
+  reserveSpend(runId: string, provider: PaidProvider, max: number): string {
+    if (!Number.isFinite(max) || max <= 0) throw new Error(`${provider} call needs a positive maxUnits before it can run`);
+    return this.atomic(() => {
+      const run = this.getRun(runId);
+      if (!run) throw new Error(`unknown run ${runId}`);
+      const sum = (col: "run_id" | "day", v: string) =>
+        Number((this.db.prepare(`SELECT COALESCE(SUM(units),0) n FROM spend WHERE provider=? AND ${col}=?`).get(provider, v) as any).n);
+      const day = budgetDay();
+      const checks = [
+        { scope: "per-run", used: sum("run_id", runId), cap: provider === "crustdata" ? run.credit_limit : limitFor(provider, "run") },
+        { scope: "daily", used: sum("day", day), cap: limitFor(provider, "day") },
+      ];
+      for (const { scope, used, cap } of checks)
+        if (used + max > cap + 1e-9) throw new BudgetExceeded("credits", `${provider} ${scope} limit ${cap} blocks this call: ${used.toFixed(2)} credits or USD used or held, up to ${max.toFixed(2)} more needed`);
+      const id = randomUUID();
+      this.db.prepare(`INSERT INTO spend VALUES (?,?,?,?,?,'held')`).run(id, runId, provider, day, max);
+      return id;
+    });
+  }
+  settleSpend(id: string, units: number) {
+    this.db.prepare(`UPDATE spend SET units=?, state='settled' WHERE id=?`).run(units, id);
+  }
+  spendToday() {
+    const day = budgetDay();
+    return PAID_PROVIDERS.map(provider => ({ provider, day, limit: limitFor(provider, "day"),
+      used_or_held: Number((this.db.prepare(`SELECT COALESCE(SUM(units),0) n FROM spend WHERE provider=? AND day=?`).get(provider, day) as any).n) }));
+  }
+
+  // ---- one runner per run ------------------------------------------------
+  acquireRun(runId: string): string {
+    return this.atomic(() => {
+      const held = this.db.prepare(`SELECT owner FROM run_leases WHERE run_id=?`).get(runId) as any;
+      if (held && ownerAlive(held.owner)) throw new Error(`run ${runId} is already running`);
+      const owner = newOwner();
+      this.db.prepare(`INSERT INTO run_leases VALUES (?,?) ON CONFLICT(run_id) DO UPDATE SET owner=excluded.owner`).run(runId, owner);
+      return owner;
+    });
+  }
+  releaseRun(runId: string, owner: string) {
+    this.db.prepare(`DELETE FROM run_leases WHERE run_id=? AND owner=?`).run(runId, owner);
+    ownTokens.delete(owner);
+  }
+
+  // ---- the person's selection before paid enrichment --------------------
+  setSelection(runId: string, leadIds: string[]) {
+    if (this.stepOutput(runId, "select")?.status === "done") throw new Error("the selection was already used for this run; start a new run to change it");
+    this.db.prepare(`INSERT INTO selections VALUES (?,?,?) ON CONFLICT(run_id) DO UPDATE SET lead_ids=excluded.lead_ids, at=excluded.at`).run(runId, JSON.stringify(leadIds), now());
+  }
+  getSelection(runId: string): string[] | null {
+    const r = this.db.prepare(`SELECT lead_ids FROM selections WHERE run_id=?`).get(runId) as any;
+    return r ? JSON.parse(r.lead_ids) : null;
+  }
+  waitStep(runId: string, name: string, why: string) {
+    this.db.prepare(`UPDATE steps SET status='waiting', error=? WHERE run_id=? AND name=?`).run(why, runId, name);
+  }
+
   // ---- evidence -----------------------------------------------------------
   addEvidence(runId: string, step: string, subject: string | null, e: Evidence): string {
     const id = randomUUID();
@@ -168,28 +255,79 @@ export class Ledger {
   listActions(runId: string): ProposedAction[] {
     return (this.db.prepare(`SELECT * FROM actions WHERE run_id=? ORDER BY created_at`).all(runId) as any[]).map(r => this.rowToAction(r));
   }
-  decideAction(id: string, decision: "approved" | "rejected", who = "person") {
+  decideAction(id: string, decision: "approved" | "rejected", who = "person", reason?: string) {
     const res = this.db.prepare(`UPDATE actions SET status=? WHERE id=? AND status='proposed'`).run(decision, id);
     if (res.changes === 0) throw new Error(`action ${id} is not awaiting a decision`);
-    this.db.prepare(`UPDATE actions SET result_json=? WHERE id=?`).run(JSON.stringify({ decided_by: who, at: now() }), id);
+    this.db.prepare(`UPDATE actions SET result_json=? WHERE id=?`).run(JSON.stringify({ decided_by: who, at: now(), ...(reason ? { reason } : {}) }), id);
   }
   /**
-   * Execute an approved action exactly once. The state transition approved→executing is a single
-   * UPDATE guarded by the current status, so two processes racing after a restart cannot both run `fn`.
+   * Execute an approved action at most once. The claim is a single write transaction, and it also refuses
+   * an action whose dedupe_key was already executed, or may have been, by another run.
+   * An outcome we cannot know (error after the call started, dead executor) becomes `unknown` for a person.
    */
   async executeAction<T>(id: string, fn: (a: ProposedAction) => Promise<T>): Promise<{ ran: boolean; result: T | null }> {
-    const claimed = this.db.prepare(`UPDATE actions SET status='executing' WHERE id=? AND status='approved'`).run(id);
-    if (claimed.changes === 0) return { ran: false, result: null };
+    const owner = this.atomic(() => {
+      const r = this.db.prepare(`SELECT status, executor, payload_json FROM actions WHERE id=?`).get(id) as any;
+      if (r?.status === "executing" && (!r.executor || !ownerAlive(r.executor)))
+        this.db.prepare(`UPDATE actions SET status='unknown' WHERE id=?`).run(id);
+      if (r?.status !== "approved" || this.isPaused()) return null;      // pause-all stops every executor here
+      const key = JSON.parse(r.payload_json).dedupe_key;
+      if (key) {
+        const twin = this.db.prepare(`SELECT id FROM actions WHERE id<>? AND status IN ('executing','executed','unknown') AND json_extract(payload_json,'$.dedupe_key')=?`).get(id, key);
+        if (twin) return null;
+      }
+      const token = newOwner();
+      this.db.prepare(`UPDATE actions SET status='executing', executor=? WHERE id=?`).run(token, id);
+      return token;
+    });
+    if (!owner) return { ran: false, result: null };
     const a = this.getAction(id)!;
     try {
       const result = await fn(a);
       this.db.prepare(`UPDATE actions SET status='executed', executed_at=?, result_json=? WHERE id=?`).run(now(), JSON.stringify(result ?? null), id);
       return { ran: true, result };
     } catch (err) {
-      // roll back to approved so a retry can execute it; nothing external happened if fn is written to act last
-      this.db.prepare(`UPDATE actions SET status='approved' WHERE id=?`).run(id);
+      // The outside world may already have accepted it. Never retry automatically.
+      this.db.prepare(`UPDATE actions SET status='unknown', result_json=? WHERE id=?`).run(JSON.stringify({ error: String((err as any)?.message ?? err), at: now() }), id);
       throw err;
+    } finally {
+      ownTokens.delete(owner);
     }
+  }
+  /** Approve exactly the text that was shown. Repeating the same approval is harmless. */
+  approveExact(id: string, draftHash: string): { id: string; ok: boolean; reason?: string } {
+    return this.atomic(() => {
+      const a = this.getAction(id);
+      if (!a) return { id, ok: false, reason: "no such draft" };
+      if (!draftHash || a.payload.draft_hash !== draftHash) return { id, ok: false, reason: "the draft changed since it was shown" };
+      if (a.status === "approved") return { id, ok: true };
+      if (a.status !== "proposed") return { id, ok: false, reason: `it is ${a.status}` };
+      this.decideAction(id, "approved");
+      return { id, ok: true };
+    });
+  }
+  /** Back to waiting. Only while nothing has been executed. */
+  undoDecision(id: string): boolean {
+    return this.db.prepare(`UPDATE actions SET status='proposed', result_json=NULL WHERE id=? AND status IN ('approved','rejected') AND executor IS NULL`).run(id).changes === 1;
+  }
+  /** An edit voids any approval. */
+  reviseDraft(id: string, previousHash: string, payload: object): boolean {
+    return this.db.prepare(`UPDATE actions SET payload_json=?, status='proposed', result_json=NULL WHERE id=? AND status IN ('proposed','approved') AND json_extract(payload_json,'$.draft_hash')=?`).run(JSON.stringify(payload), id, previousHash).changes === 1;
+  }
+  /** The time ceiling counts active work: an edit long after the run is new work. */
+  restartClock(runId: string) {
+    this.db.prepare(`UPDATE runs SET clock_started_at=? WHERE id=?`).run(now(), runId);
+  }
+  setPaused(paused: boolean) {
+    this.db.prepare(`INSERT INTO controls VALUES ('paused',?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value, at=excluded.at`).run(paused ? "1" : "0", now());
+  }
+  isPaused(): boolean {
+    return (this.db.prepare(`SELECT value FROM controls WHERE name='paused'`).get() as any)?.value === "1";
+  }
+  /** A person checked what really happened to an action with an unknown outcome. */
+  reconcileAction(id: string, outcome: "done" | "not-done") {
+    const res = this.db.prepare(`UPDATE actions SET status=?, executed_at=? WHERE id=? AND status='unknown'`).run(outcome === "done" ? "executed" : "approved", outcome === "done" ? now() : null, id);
+    if (res.changes === 0) throw new Error(`action ${id} has no unknown outcome to reconcile`);
   }
   private rowToAction(r: any): ProposedAction {
     return { id: r.id, run_id: r.run_id, kind: r.kind, idempotency_key: r.idempotency_key, status: r.status, payload: JSON.parse(r.payload_json), created_at: r.created_at, executed_at: r.executed_at };

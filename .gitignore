@@ -2,9 +2,11 @@ node_modules/
 dist/
 .env
 .env.*
+!.env.example
 *.db
 *.db-journal
 data/raw/
+data/customs/
 .DS_Store
 data/out/
 *.db-wal

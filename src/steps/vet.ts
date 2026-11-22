@@ -1,4 +1,6 @@
 import type { StepCtx } from "../runner/pipeline.js";
+import { MAX_CREDITS } from "../core/limits.js";
+import { BudgetExceeded } from "../core/types.js";
 import type { Candidate } from "../core/types.js";
 import { flattenCompany } from "../sources/crustdata.js";
 import { crust, apiEvidence, ADVERSE } from "./common.js";
@@ -19,7 +21,7 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
   let retrieved_at = new Date().toISOString();
   if (ids.length) {
     try {
-      const r = await ctx.call({ source: "crustdata", endpoint: "/company/enrich", request: { ids, fields: ["basic_info", "headcount", "funding", "news"] }, credits: (x: any) => x.credits },
+      const r = await ctx.call({ source: "crustdata", endpoint: "/company/enrich", request: { ids, fields: ["basic_info", "headcount", "funding", "news"] }, maxUnits: MAX_CREDITS.companyEnrich(ids.length), credits: (x: any) => x.credits },
         async () => { const x = await crust().companyEnrich({ ids, fields: ["basic_info", "headcount", "funding", "news"] }); return { items: x.data.companies ?? x.data.items ?? (Array.isArray(x.data) ? x.data : []), credits: x.credits, retrieved_at: x.retrieved_at }; });
       retrieved_at = r.data.retrieved_at ?? r.retrieved_at;
       for (const item of r.data.items as any[]) {
@@ -31,14 +33,14 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
       }
       enrichedIds = [...records.keys()];
       ctx.log(`vet: enriched ${enrichedIds.length}/${ids.length} (${r.cached ? "memo" : `${r.credits} credits`})`);
-    } catch (err: any) { notes.push(`enrich unavailable: ${err?.message ?? err}`); ctx.log(`vet: enrich failed (${err?.message ?? err}); tiers fall back to AMBER insufficient data`); }
+    } catch (err: any) { if (err instanceof BudgetExceeded) throw err; notes.push(`enrich unavailable: ${err?.message ?? err}`); ctx.log(`vet: enrich failed (${err?.message ?? err}); tiers fall back to AMBER insufficient data`); }
   }
   const year = new Date().getFullYear();
   const since = new Date(Date.now() - 365 * 86400e3);
   for (const cand of search.candidates) {
     const rec = records.get(cand.company_id);
     const sanctions = screen(cand.name);
-    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest entry ${sanctions.near.name} at ${sanctions.near.score}, below the ${92} threshold, listed for a person)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
+    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : !sanctions.checked_lists.length ? `${cand.name} not screened: no sanctions list is loaded` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest entry ${sanctions.near.name} at ${sanctions.near.score}, below the ${92} threshold, listed for a person)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
     let adverse: number | null = null;
     if (rec) {
       const c = rec.c;
@@ -52,7 +54,7 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
       if (c.growth_12m != null) cand.evidence.push(apiEvidence(`${cand.name} 12-month headcount change ${c.growth_12m}%`, ep, cand.company_id, "headcount.growth_percent.12m", retrieved_at, null, ctx.runId));
       if (c.funding_usd != null) cand.evidence.push(apiEvidence(`${cand.name} total funding USD ${c.funding_usd}`, ep, cand.company_id, "funding.total_investment_usd", retrieved_at, null, ctx.runId));
       if (c.year_founded != null) cand.evidence.push(apiEvidence(`${cand.name} founded ${c.year_founded}`, ep, cand.company_id, "basic_info.year_founded", retrieved_at, null, ctx.runId));
-      cand.evidence.push(apiEvidence(`${cand.name} news items in last 12 months: ${news.length}, adverse: ${adverse}`, ep, cand.company_id, "news", retrieved_at, ctx.runId));
+      cand.evidence.push(apiEvidence(`${cand.name} news items in last 12 months: ${news.length}, adverse: ${adverse}`, ep, cand.company_id, "news", retrieved_at, null, ctx.runId));
     }
     const trust = scoreTrust({ headcount: cand.headcount, growth_12m: cand.growth_12m, year_founded: cand.year_founded, domain: cand.domain, sanctions: sanctions.checked_lists.length ? sanctions : null, adverse_news: adverse, enriched: !!rec, last_round_type: rec?.c.last_round_type ?? null }, year);
     cand.trust_tier = trust.tier; cand.trust_reasons = trust.reasons;

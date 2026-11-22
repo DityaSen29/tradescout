@@ -1,6 +1,8 @@
 import { Ledger, hashOf, now } from "../ledger/ledger.js";
 import type { Evidence, TradeRequest } from "../core/types.js";
-import { BudgetExceeded } from "../core/types.js";
+import { BudgetExceeded, NeedsPerson } from "../core/types.js";
+import { neverSent } from "../core/net.js";
+import { paidProvider } from "../core/limits.js";
 
 /**
  * A pipeline is an ordered list of steps. Each step's output is committed to the ledger before the
@@ -16,16 +18,21 @@ export interface StepCtx {
   step: string;
   log: (msg: string) => void;
   /** Wrap any external call: budget check, timing, cost ledger, per-run memo. */
-  call: <T>(meta: { source: string; endpoint: string; request: unknown; credits?: (res: T) => number; model_cost_usd?: (res: T) => number; cacheable?: boolean }, fn: () => Promise<T>) => Promise<{ data: T; cached: boolean; retrieved_at: string; latency_ms: number; credits: number }>;
+  call: <T>(meta: { source: string; endpoint: string; request: unknown; maxUnits?: number; credits?: (res: T) => number | null; model_cost_usd?: (res: T) => number; cacheable?: boolean }, fn: () => Promise<T>) => Promise<{ data: T; cached: boolean; retrieved_at: string; latency_ms: number; credits: number }>;
   evidence: (subject: string | null, e: Evidence) => void;
 }
 export interface StepDef { name: string; run: (ctx: StepCtx) => Promise<unknown>; optional?: boolean }
 
-export interface RunOptions { log?: (msg: string) => void; onStep?: (name: string, status: "start" | "done" | "skip" | "fail" | "unavailable", info?: unknown) => void }
+export interface RunOptions { log?: (msg: string) => void; onStep?: (name: string, status: "start" | "done" | "skip" | "fail" | "unavailable" | "waiting", info?: unknown) => void }
 
 export async function runPipeline(ledger: Ledger, runId: string, steps: StepDef[], opts: RunOptions = {}): Promise<Record<string, unknown>> {
-  const run = ledger.getRun(runId);
-  if (!run) throw new Error(`unknown run ${runId}`);
+  if (!ledger.getRun(runId)) throw new Error(`unknown run ${runId}`);
+  const owner = ledger.acquireRun(runId);
+  try { return await runSteps(ledger, runId, steps, opts); } finally { ledger.releaseRun(runId, owner); }
+}
+
+async function runSteps(ledger: Ledger, runId: string, steps: StepDef[], opts: RunOptions): Promise<Record<string, unknown>> {
+  const run = ledger.getRun(runId)!;
   const log = opts.log ?? (() => {});
   const outputs: Record<string, unknown> = {};
   ledger.setRunStatus(runId, "running");
@@ -54,6 +61,13 @@ export async function runPipeline(ledger: Ledger, runId: string, steps: StepDef[
       opts.onStep?.(step.name, "done", out);
       log(`✓ ${step.name}`);
     } catch (err: any) {
+      if (err instanceof NeedsPerson) {
+        ledger.waitStep(runId, step.name, err.message);
+        ledger.setRunStatus(runId, "awaiting_person");
+        opts.onStep?.(step.name, "waiting", err.message);
+        log(`⏸ ${step.name}: ${err.message}`);
+        return outputs;
+      }
       if (err instanceof BudgetExceeded) {
         ledger.failStep(runId, step.name, err.message);
         ledger.setRunStatus(runId, "budget_exceeded");
@@ -82,7 +96,7 @@ export async function runPipeline(ledger: Ledger, runId: string, steps: StepDef[
   return outputs;
 }
 
-function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: Record<string, unknown>, step: string, log: (m: string) => void): StepCtx {
+export function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: Record<string, unknown>, step: string, log: (m: string) => void): StepCtx {
   return {
     runId, request, ledger, outputs, step, log,
     evidence: (subject, e) => { ledger.addEvidence(runId, step, subject, e); },
@@ -96,16 +110,24 @@ function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: 
         }
       }
       ledger.assertBudget(runId);
+      const provider = paidProvider(meta.source);
+      const hold = provider ? ledger.reserveSpend(runId, provider, meta.maxUnits ?? 0) : null;
       const t0 = Date.now();
       try {
         const data = await fn();
         const latency_ms = Date.now() - t0;
-        const credits = meta.credits?.(data) ?? 0;
-        const model_cost_usd = meta.model_cost_usd?.(data) ?? 0;
+        const reported = provider === "llm" ? meta.model_cost_usd?.(data) : meta.credits?.(data);
+        // no usable charge reported by a paid provider: count the worst case
+        const units = !provider ? 0 : typeof reported === "number" && Number.isFinite(reported) && reported >= 0 ? reported : meta.maxUnits!;
+        const credits = provider === "llm" ? 0 : units;
+        const model_cost_usd = provider === "llm" ? units : 0;
+        if (hold) ledger.settleSpend(hold, units);
         const retrieved_at = now();
         ledger.recordCall({ run_id: runId, step, source: meta.source, endpoint: meta.endpoint, request_hash: requestHash, status: "ok", credits, model_cost_usd, latency_ms, retrieved_at, response_json: JSON.stringify(data), note: null });
         return { data, cached: false, retrieved_at, latency_ms, credits };
       } catch (err: any) {
+        // only a client-error rejection is known to be free; timeouts, 5xx and bad bodies keep their hold
+        if (hold && (neverSent(err) || (err?.status >= 400 && err.status < 500 && err.status !== 408))) ledger.settleSpend(hold, 0);
         ledger.recordCall({ run_id: runId, step, source: meta.source, endpoint: meta.endpoint, request_hash: requestHash, status: "error", credits: 0, model_cost_usd: 0, latency_ms: Date.now() - t0, response_json: null, note: String(err?.message ?? err) });
         throw err;
       }

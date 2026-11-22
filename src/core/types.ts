@@ -7,12 +7,16 @@ export const RequestSchema = z.object({
   min_headcount: z.number().int().min(1).default(20),
   max_headcount: z.number().int().min(1).default(2000),
   fob_price_usd: z.number().positive().optional(),
-  hs_code: z.string().regex(/^\d{4,6}$/).optional(),      // the person's pick when the product was ambiguous
-  notes: z.string().optional(),
+  hs_code: z.string().regex(/^\d{4,8}$/).optional(),      // the person's pick when the product was ambiguous
+  notes: z.string().max(1000).optional(),     // the seller's own offer facts, quotable in outreach
+  client_id: z.string().max(80).optional(),
+  origin_country: z.string().min(2).max(80).optional(),   // where the seller ships from; otherwise read from its own words
+  client_name: z.string().min(4).max(120).optional(),     // the exporter itself: importers it already supplies are never prospects
+  do_not_contact: z.array(z.string().max(200)).max(500).optional(),   // existing customers, agents, distributors
 });
 export type TradeRequest = z.infer<typeof RequestSchema>;
 
-export const SourceType = z.enum(["crustdata", "comtrade", "wits", "sanctions", "web", "user", "ledger"]);
+export const SourceType = z.enum(["crustdata", "comtrade", "wits", "sanctions", "web", "customs", "user", "ledger"]);
 export type SourceType = z.infer<typeof SourceType>;
 
 /** Every claim carries one of these. No evidence, no claim. */
@@ -70,7 +74,7 @@ export interface ProposedAction {
   run_id: string;
   kind: "email_draft" | "rfq_draft" | "shortlist_file";
   idempotency_key: string;
-  status: "proposed" | "approved" | "rejected" | "executing" | "executed";
+  status: "proposed" | "approved" | "rejected" | "executing" | "executed" | "unknown";
   payload: Record<string, unknown>;
   created_at: string;
   executed_at: string | null;
@@ -89,6 +93,11 @@ export interface Report {
   actions: ProposedAction[];
   limitations: string[];
   ledger: { credits_used: number; model_cost_usd: number; calls: number; elapsed_ms: number; credit_limit: number; time_limit_ms: number };
+}
+
+/** Thrown by a step that cannot continue without a person. The run pauses; resume picks it up. */
+export class NeedsPerson extends Error {
+  constructor(msg: string) { super(msg); this.name = "NeedsPerson"; }
 }
 
 export class BudgetExceeded extends Error {

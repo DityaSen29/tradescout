@@ -1,181 +1,91 @@
-/* TradeScout desk: a thin client over the API. No build step. */
-const $ = (s, el = document) => el.querySelector(s);
-const STEPS = [["parse", "Read the request"], ["market", "Market"], ["tariff", "Duty"], ["policy", "Policy"], ["search", "Find counterparties"], ["vet", "Vet them"], ["intent", "Buying signals"], ["contacts", "Find the buyer"], ["draft", "Draft the note"], ["report", "Write the report"]];
-let current = null, es = null, pollTimer = null;
+/* A minimal client over the API in docs/api.md. It is meant to be replaced. */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const safeUrl = (u) => (/^https?:\/\//i.test(u ?? "") ? u : null);
+const LABEL = { import_record: "Import record", product_match: "Product match, no import proof", category_match: "Category match only", cannot_verify: "Cannot verify" };
+let current = null, es = null;
 
-const fmtCredits = (n) => (Math.round((n ?? 0) * 100) / 100).toString();
-const fmtMs = (ms) => ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
-const when = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "";
-const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+async function api(path, body, method) {
+  const r = await fetch(`/api${path}`, { method: method ?? (body ? "POST" : "GET"), headers: { "content-type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || `${r.status} on ${path}`);
+  return d;
+}
+const traceLine = (agent, message) => `<div class="row"><b>${esc(agent)}</b> ${esc(message)}</div>`;
 
-async function api(path, opts) {
-  const r = await fetch(`/api${path}`, { headers: { "content-type": "application/json" }, ...opts });
-  const body = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(body.error || `${r.status} on ${path}`);
-  return body;
+function leadRow(l, waiting) {
+  const b = l.behaviour;
+  const facts = b ? [`${b.records} records`, `${b.first_month} to ${b.last_month}`, b.total_value_usd && `$${b.total_value_usd.toLocaleString()}`, b.net_weight_kg && `${b.net_weight_kg.toLocaleString()} kg`, b.median_usd_per_kg && `median $${b.median_usd_per_kg}/kg`].filter(Boolean).join(" · ") : "";
+  const proof = l.claims.map((c) => { const u = safeUrl(c.source_url); return `<li>${esc(c.text)}<br><q>${esc(c.quote)}</q> ${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">source</a>` : `<span class="muted">${esc(c.record_id)}</span>`}</li>`; }).join("");
+  return `<div class="row"><label>${waiting ? `<input type="checkbox" value="${esc(l.lead_id)}"> ` : ""}<strong>${esc(l.company.name)}</strong> ${esc(LABEL[l.match])}${l.related_party ? " · related party, ranked last" : ""} · fit ${esc(l.fit_score)}</label>
+    <div class="muted">${esc(facts || l.match_reason)}</div>
+    ${l.contact ? `<div>${esc(l.contact.name)}, ${esc(l.contact.title)} · ${esc(l.contact.email ?? "no work email")} (${esc(l.contact.email_status)})</div>` : ""}
+    ${l.needs_person.length ? `<div class="muted">Needs a person: ${esc(l.needs_person.join("; "))}</div>` : ""}
+    ${proof ? `<details><summary>${l.claims.length} evidence</summary><ul>${proof}</ul></details>` : ""}</div>`;
 }
 
-async function health() {
-  try { await api("/health"); $("#api-state").textContent = "api live"; $("#api-state").className = "pill live"; }
-  catch { $("#api-state").textContent = "api unreachable"; $("#api-state").className = "pill bad"; }
+function render(d) {
+  $("#status").textContent = d.run.status.replace(/_/g, " ");
+  $("#cost").textContent = `${d.totals.credits_used.toFixed(1)} credits, about ₹${d.totals.estimated_inr}`;
+  $("#trace").innerHTML = d.trace.map((t) => traceLine(t.agent, t.message)).join("") + d.steps.filter((s) => s.error).map((s) => traceLine(s.name, String(s.error).split("\n")[0])).join("");
+  const waiting = d.run.status === "awaiting_person";
+  const leads = d.report?.leads ?? d.shortlist;
+  $("#shortlist").innerHTML = leads.map((l) => leadRow(l, waiting)).join("") || '<p class="muted">Nothing yet.</p>';
+  $("#select").hidden = !waiting;
+  $("#resume").hidden = d.running || !["failed", "running"].includes(d.run.status);
+  $("#drafts").innerHTML = d.actions.filter((a) => a.kind === "email_draft").map((a) => `<div class="row" data-id="${esc(a.id)}"><strong>${esc(a.payload.subject)}</strong>
+    <div class="muted">${esc(a.payload.company)} · ${esc(a.status)}</div><div class="body">${esc(a.payload.body)}</div>
+    ${a.status === "proposed" ? '<button data-v="approve">Approve</button> <button class="quiet" data-v="reject">Reject</button>' : ""}
+    ${a.status === "approved" ? '<button data-v="execute">Write to test outbox</button>' : ""}
+    ${a.status === "unknown" ? "Outcome unknown: check it, then reconcile. It will not retry." : ""}</div>`).join("") || '<p class="muted">No drafts yet.</p>';
 }
 
-async function loadRuns() {
-  const runs = await api("/runs");
-  const ul = $("#run-list"); ul.innerHTML = "";
-  if (!runs.length) ul.innerHTML = `<li class="r-empty">No runs yet.</li>`;
-  for (const r of runs) {
-    const li = document.createElement("li");
-    li.className = r.id === current ? "active" : "";
-    li.innerHTML = `<span>${esc(r.request.product)} → ${esc(r.request.target_country)}<br><small>${when(r.created_at)} · ${fmtCredits(r.totals.credits_used)} cr</small></span><span class="r-status">${esc(r.status)}</span>`;
-    li.onclick = () => openRun(r.id);
-    ul.appendChild(li);
-  }
-}
-
-function renderSteps(steps, liveState = {}) {
-  const ol = $("#steps"); ol.innerHTML = "";
-  const byName = Object.fromEntries((steps || []).map(s => [s.name, s]));
-  for (const [name, label] of STEPS) {
-    const s = byName[name]; const live = liveState[name];
-    let cls = live || (s ? (s.status === "done" ? (s.attempts > 1 ? "done" : "done") : s.status === "running" ? "running" : s.status === "failed" ? "fail" : "") : "");
-    const out = s && s.status === "done" ? "" : "";
-    const li = document.createElement("li"); li.className = cls;
-    li.innerHTML = `${esc(label)}<small>${s ? (s.status === "done" ? `done${s.attempts > 1 ? `, attempt ${s.attempts}` : ""}` : s.status === "failed" ? "failed" : s.status) : (live || "waiting")}${out}</small>`;
-    ol.appendChild(li);
-  }
-}
-
-function layerBox(title, layer, render) {
-  if (!layer) return `<div class="layer"><h3>${title}</h3><p class="state">not run</p></div>`;
-  if (layer.status !== "ok") return `<div class="layer"><h3>${title}</h3><p class="state">${esc(layer.status === "cannot_verify" ? "cannot verify" : "unavailable")}${layer.reason ? `: ${esc(layer.reason)}` : ""}</p></div>`;
-  return `<div class="layer"><h3>${title}</h3>${render(layer)}</div>`;
-}
-
-function renderReport(d) {
-  const r = d.report;
-  $("#request-line").textContent = `${d.run.request.product} for ${d.run.request.target_country}, ${d.run.request.min_headcount} to ${d.run.request.max_headcount} staff`;
-  $("#resolved").textContent = r?.resolved ? `Read as HS ${r.resolved.hs_code ?? "?"}${r.resolved.hs_text ? ` (${r.resolved.hs_text})` : ""} in ${r.resolved.country_iso3 ?? "?"}; search language: ${(r.resolved.keywords || []).slice(0, 4).join(", ")}` : "";
-  const st = $("#run-status"); st.textContent = d.running ? "running" : d.run.status; st.className = `pill ${d.run.status === "done" ? "live" : d.run.status === "failed" || d.run.status === "budget_exceeded" ? "bad" : ""}`;
-  $("#resume-btn").hidden = d.running || !(d.run.status === "failed" || d.run.status === "running");
-  $("#rerun-btn").hidden = d.run.status !== "done";
-  renderSteps(d.steps);
-  const failed = (d.steps || []).find(s => s.status === "failed" && /needs input|cannot verify/.test(s.error || ""));
-  const ask = $("#ask");
-  if (failed) {
-    const msg = String(failed.error).split("\n")[0];
-    const codes = [...msg.matchAll(/\b(\d{4,6}) \(([^)]+)\)/g)].map(m => ({ code: m[1], text: m[2] }));
-    ask.hidden = false;
-    ask.innerHTML = `<h2>${/needs input/.test(msg) ? "The desk needs one answer before it spends anything" : "The desk cannot verify the request"}</h2><p>${esc(msg.replace(/^(needs input|cannot verify request): /, ""))}</p>` +
-      (codes.length ? `<div class="btns">${codes.map(c => `<button data-hs="${esc(c.code)}">Use HS ${esc(c.code)}: ${esc(c.text)}</button>`).join("")}</div>` : "");
-    ask.onclick = async (e) => { const hs = e.target.dataset.hs; if (!hs) return; e.target.disabled = true; const { run_id } = await api("/runs", { method: "POST", body: JSON.stringify({ ...d.run.request, hs_code: hs }) }); openRun(run_id); };
-  } else { ask.hidden = true; ask.innerHTML = ""; }
-
-  // layers
-  $("#layers").innerHTML = [
-    layerBox("Market", r?.market, (l) => `<p>${esc(l.data?.summary ?? "")}</p>`),
-    layerBox("Duty", r?.tariff, (l) => `<p>${esc(l.data?.summary ?? "")}</p>`),
-    layerBox("Policy", r?.policy, (l) => `<p>${esc(l.data?.summary ?? "")}</p>${(l.data?.items || []).map(i => `<p><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a> <span class="state">${esc(i.date ? String(i.date).slice(0, 10) : "")}</span></p>`).join("")}`),
-    layerBox("Since last run", r?.monitor, (l) => l.data.changes.length ? `<ul>${l.data.changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : `<p>No change since ${when(l.data.since)}.</p>`),
-  ].join("");
-
-  // shortlist
-  const box = $("#shortlist"); box.innerHTML = "";
-  const cands = r?.candidates || [];
-  $("#shortlist-title").textContent = cands.length ? `Shortlist, ${cands.length} counterparties` : "Shortlist";
-  if (!cands.length) box.innerHTML = `<p class="notice">${d.run.status === "done" ? "No counterparties matched. Try a wider staff range or a different wording of the product." : "Nothing yet. The shortlist fills in when the report step finishes."}</p>`;
-  const tpl = $("#candidate-row");
-  cands.forEach((c, i) => {
-    const n = tpl.content.cloneNode(true);
-    $(".rank", n).textContent = i + 1;
-    $(".name", n).textContent = c.name;
-    $(".meta", n).textContent = [c.domain, c.city || c.country, c.headcount != null ? `${c.headcount} staff` : null, c.year_founded ? `since ${c.year_founded}` : null].filter(Boolean).join(" · ");
-    $(".why", n).textContent = `${c.fit_reasons.slice(0, 3).join("; ")}${c.trust_reasons.length ? `. Trust: ${c.trust_reasons.slice(0, 2).join("; ")}` : ""}`;
-    const ct = $(".contact", n);
-    if (c.contact) ct.textContent = `Buyer: ${c.contact.name}, ${c.contact.title}`; else { ct.textContent = c.unresolved[0] ? `Needs a person: ${c.unresolved[0]}` : "No contact looked up (not vetted)"; ct.classList.add("missing"); }
-    const ev = $(".evidence", n); $("summary", ev).textContent = `${c.evidence.length} sources`;
-    $("ul", ev).innerHTML = c.evidence.map(e => `<li>${esc(e.claim)} <a href="${esc(e.source_url)}" target="_blank" rel="noopener">${esc(e.source_type)}${e.record_id ? ` #${esc(e.record_id)}` : ""}${e.field ? ` · ${esc(e.field)}` : ""}</a> <span class="state">${e.record_date ? `dated ${esc(e.record_date)}` : `retrieved ${when(e.retrieved_at)}`}</span></li>`).join("");
-    const stamp = $(".stamp", n); stamp.textContent = c.trust_tier; stamp.classList.add(c.trust_tier);
-    $(".fit i", n).style.width = `${c.fit_score}%`; $(".fit .num", n).textContent = `fit ${c.fit_score}`;
-    $(".intent", n).textContent = c.intent_tags.length ? `Signals: ${c.intent_tags.join("; ")}` : "";
-    box.appendChild(n);
-  });
-
-  // needs a person
-  const np = $("#needs-person");
-  const items = r?.unresolved || [];
-  np.innerHTML = items.length ? `<h2>Needs a person, ${items.length}</h2><ul>${items.map(u => `<li>${esc(u)}</li>`).join("")}</ul>` : "";
-  if (r?.limitations?.length) np.innerHTML += `<details><summary>What this run does not do</summary><ul>${r.limitations.map(l => `<li>${esc(l)}</li>`).join("")}</ul></details>`;
-
-  // ledger
-  const t = d.totals; const run = d.run;
-  const elapsed = r?.ledger?.elapsed_ms;
-  $("#ledger").innerHTML = `<dt>Crustdata credits</dt><dd>${fmtCredits(t.credits_used)} of ${run.credit_limit}</dd><dt>Model cost</dt><dd>$${(t.model_cost_usd || 0).toFixed(3)}</dd><dt>Calls</dt><dd>${t.calls}</dd><dt>Active time</dt><dd>${elapsed != null ? fmtMs(elapsed) : "running"} of ${fmtMs(run.time_limit_ms)}</dd><dt>Checkpoints</dt><dd>${(d.steps || []).filter(s => s.status === "done").length} of ${STEPS.length}</dd>`;
-  api(`/runs/${d.run.id}/ledger`).then(l => {
-    $("#calls").innerHTML = l.calls.map(c => `<tr><td>${esc(c.step)}<br><small>${esc(c.source)} ${esc(c.endpoint)}${c.status === "cached" ? " (memo)" : c.status === "error" ? " (error)" : ""}</small></td><td>${fmtCredits(c.credits)} cr<br><small>${fmtMs(c.latency_ms)}</small></td></tr>`).join("");
-  }).catch(() => {});
-
-  // actions
-  const ab = $("#actions"); ab.innerHTML = "";
-  const acts = (d.actions || []).filter(a => a.kind === "email_draft");
-  if (!acts.length) ab.innerHTML = `<p class="state">${d.run.status === "done" ? "No drafts: no vetted counterparty had a reachable buyer." : "Drafts appear after the draft step."}</p>`;
-  for (const a of acts) {
-    const div = document.createElement("div"); div.className = `action ${a.status}`;
-    div.innerHTML = `<p class="to">${esc(a.payload.to_name)}, ${esc(a.payload.to_title)} at ${esc(a.payload.company)}</p><p class="state">${esc(a.status)}${a.executed_at ? ` at ${when(a.executed_at)}` : ""}</p><div class="body">${esc(a.payload.body)}</div><div class="btns"></div>`;
-    const btns = $(".btns", div);
-    if (a.status === "proposed") btns.innerHTML = `<button data-v="approve">Approve</button><button data-v="reject" class="ghost">Reject</button>`;
-    if (a.status === "approved") btns.innerHTML = `<button data-v="execute">Write the .eml file</button>`;
-    if (a.status === "executed") btns.innerHTML = `<span class="state">Written once to data/out. Sending stays with you.</span>`;
-    btns.onclick = async (e) => { const v = e.target.dataset.v; if (!v) return; e.target.disabled = true; try { await api(`/actions/${a.id}/${v}`, { method: "POST" }); } catch (err) { alert(err.message); } openRun(current); };
-    ab.appendChild(div);
-  }
-
-  // graph rail
-  const gr = $("#graph");
-  if (r?.graph) {
-    const counts = {}; for (const n of r.graph.nodes) counts[n.label] = (counts[n.label] || 0) + 1;
-    gr.innerHTML = `<h2>Context graph</h2><dl>${Object.entries(counts).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}<dt>Edges</dt><dd>${r.graph.edges.length}</dd></dl><p class="state">Ranking runs on this graph: keyword coverage, family membership, support from similar peers, and signals.</p>`;
-  } else gr.innerHTML = "";
-  // monitor rail
-  const m = $("#monitor");
-  m.innerHTML = r?.monitor?.status === "ok" ? `<h2>Since ${when(r.monitor.data.since)}</h2>${r.monitor.data.changes.length ? `<ul>${r.monitor.data.changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : "<p>No change.</p>"}` : "";
-}
-
-async function openRun(id) {
-  current = id; if (es) { es.close(); es = null; } clearTimeout(pollTimer);
-  $("#empty").hidden = true; $("#sheet").hidden = false;
+async function open(id) {
+  current = id;
+  es?.close(); es = null;
   const d = await api(`/runs/${id}`);
-  renderReport(d); loadRuns();
-  if (d.running || d.run.status === "running") follow(id);
+  render(d);
+  const l = await api(`/runs/${id}/ledger`);
+  $("#calls").innerHTML = l.calls.map((c) => `<div class="row">${esc(c.step)} · ${esc(c.endpoint)} · ${esc(c.status)} · ${c.credits ? `${esc(c.credits)} cr` : c.model_cost_usd ? `$${c.model_cost_usd.toFixed(4)}` : "free"}</div>`).join("");
+  if (d.running) follow(id);
 }
 
 function follow(id) {
-  const liveState = {};
+  $("#trace").innerHTML = "";
   es = new EventSource(`/api/runs/${id}/events`);
-  es.addEventListener("step", (ev) => {
-    const e = JSON.parse(ev.data);
-    liveState[e.name] = e.status === "start" ? "running" : e.status === "done" ? "done" : e.status === "skip" ? "reused" : e.status === "unavailable" ? "unavailable" : e.status === "fail" ? "fail" : "";
-    const ol = $("#steps"); const idx = STEPS.findIndex(s => s[0] === e.name); const li = ol.children[idx];
-    if (li) { li.className = liveState[e.name]; li.querySelector("small").textContent = e.status === "skip" ? "reused checkpoint" : e.status === "start" ? `running${e.info?.attempt > 1 ? `, attempt ${e.info.attempt}` : ""}` : e.status === "unavailable" ? `unavailable: ${e.info}` : e.status === "fail" ? `failed: ${String(e.info).slice(0, 60)}` : e.status; }
-    if (e.name === "report" && e.status === "done") openRun(id);
-  });
-  es.addEventListener("log", (ev) => { const e = JSON.parse(ev.data); $("#run-status").textContent = e.message.slice(0, 80); });
-  es.addEventListener("done", () => { es.close(); es = null; openRun(id); });
-  es.addEventListener("error", (ev) => { try { const e = JSON.parse(ev.data); $("#run-status").textContent = e.message.slice(0, 120); $("#run-status").className = "pill bad"; } catch {} es?.close(); es = null; setTimeout(() => openRun(id), 400); });
-  // safety net if the stream drops
-  pollTimer = setTimeout(async function poll() { const d = await api(`/runs/${id}`).catch(() => null); if (d && !d.running) openRun(id); else pollTimer = setTimeout(poll, 3000); }, 5000);
+  const add = (a, m) => { $("#trace").insertAdjacentHTML("beforeend", traceLine(a, m)); $("#trace").scrollTop = 1e7; };
+  es.addEventListener("agent", (ev) => { const e = JSON.parse(ev.data); add(e.agent, e.message); });
+  es.addEventListener("step", (ev) => { const e = JSON.parse(ev.data); $("#status").textContent = `${e.name}: ${e.status}`; });
+  const end = () => { es?.close(); es = null; setTimeout(() => current === id && open(id), 300); };
+  es.addEventListener("done", end);
+  es.addEventListener("error", end);
 }
 
-$("#request-form").onsubmit = async (e) => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const body = { product: f.get("product"), target_country: f.get("target_country"), min_headcount: Number(f.get("min_headcount")), max_headcount: Number(f.get("max_headcount")) };
-  if (f.get("hs_code")) body.hs_code = String(f.get("hs_code")).trim();
-  try { const { run_id } = await api("/runs", { method: "POST", body: JSON.stringify(body) }); await openRun(run_id); }
-  catch (err) { alert(err.message); }
-};
-$("#resume-btn").onclick = async () => { await api(`/runs/${current}/resume`, { method: "POST" }); openRun(current); };
-$("#rerun-btn").onclick = async () => { const d = await api(`/runs/${current}`); const { run_id } = await api("/runs", { method: "POST", body: JSON.stringify(d.run.request) }); openRun(run_id); };
+async function loadRuns() {
+  $("#runs").innerHTML = (await api("/runs")).map((r) => `<div class="row"><button class="quiet" data-id="${esc(r.id)}">${esc(r.request.product)}, ${esc(r.request.target_country)}</button></div>`).join("");
+}
+const guarded = (fn) => async (e) => { try { await fn(e); } catch (err) { alert(err.message); } };
 
-health(); loadRuns(); setInterval(health, 15000);
-const hash = location.hash.slice(1); if (hash) openRun(hash);
+$("#brief").onsubmit = (e) => { e.preventDefault(); guarded(async () => {
+  const f = Object.fromEntries(new FormData(e.target));
+  const body = { product: f.product, target_country: f.target_country };
+  if (f.hs_code) body.hs_code = f.hs_code.trim();
+  if (f.client_name) body.client_name = f.client_name.trim();
+  if (f.notes) body.notes = f.notes.trim();
+  if (f.do_not_contact) body.do_not_contact = f.do_not_contact.split("\n").map((s) => s.trim()).filter(Boolean);
+  const { run_id } = await api("/runs", body);
+  await open(run_id); await loadRuns();
+})(); };
+$("#runs").onclick = guarded(async (e) => { if (e.target.dataset.id) await open(e.target.dataset.id); });
+$("#select").onclick = guarded(async () => {
+  await api(`/runs/${current}/select`, { lead_ids: [...document.querySelectorAll("#shortlist input:checked")].map((x) => x.value) });
+  await open(current);
+});
+$("#resume").onclick = guarded(async () => { await api(`/runs/${current}/resume`, {}); await open(current); });
+$("#drafts").onclick = guarded(async (e) => {
+  const v = e.target.dataset.v; if (!v) return;
+  const r = await api(`/actions/${e.target.closest("[data-id]").dataset.id}/${v}`, {});
+  if (v === "execute" && r.ran === false) alert(r.reason || "Not written: this buyer already has an executed or unresolved email.");
+  await open(current);
+});
+loadRuns().catch((err) => { $("#status").textContent = err.message; });

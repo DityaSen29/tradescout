@@ -26,8 +26,8 @@ describe("ledger", () => {
     const l = new Ledger(":memory:");
     const run = l.createRun(req, { credit_limit: 1 });
     const steps = [{ name: "spend", run: async (ctx: any) => {
-      await ctx.call({ source: "test", endpoint: "/a", request: 1, credits: () => 2 }, async () => "x");
-      await ctx.call({ source: "test", endpoint: "/b", request: 2, credits: () => 2 }, async () => "y");
+      await ctx.call({ source: "crustdata", endpoint: "/a", request: 1, maxUnits: 2, credits: () => 2 }, async () => "x");
+      await ctx.call({ source: "crustdata", endpoint: "/b", request: 2, maxUnits: 2, credits: () => 2 }, async () => "y");
     } }];
     await expect(runPipeline(l, run, steps)).rejects.toBeInstanceOf(BudgetExceeded);
     expect(l.getRun(run)!.status).toBe("budget_exceeded");
@@ -40,8 +40,8 @@ describe("pipeline resume", () => {
     const run = l.createRun(req);
     let aRuns = 0, bRuns = 0, paid = 0;
     const steps = (crash: boolean) => [
-      { name: "a", run: async (ctx: any) => { aRuns++; const r = await ctx.call({ source: "t", endpoint: "/x", request: { q: 1 }, credits: () => 3 }, async () => { paid++; return { v: 42 }; }); return r.data; } },
-      { name: "b", run: async (ctx: any) => { bRuns++; if (crash) throw new Error("boom"); const r = await ctx.call({ source: "t", endpoint: "/x", request: { q: 1 }, credits: () => 3 }, async () => { paid++; return { v: 42 }; }); return { from_a: ctx.outputs.a, memo: r.cached }; } },
+      { name: "a", run: async (ctx: any) => { aRuns++; const r = await ctx.call({ source: "crustdata", endpoint: "/x", request: { q: 1 }, maxUnits: 3, credits: () => 3 }, async () => { paid++; return { v: 42 }; }); return r.data; } },
+      { name: "b", run: async (ctx: any) => { bRuns++; if (crash) throw new Error("boom"); const r = await ctx.call({ source: "crustdata", endpoint: "/x", request: { q: 1 }, maxUnits: 3, credits: () => 3 }, async () => { paid++; return { v: 42 }; }); return { from_a: ctx.outputs.a, memo: r.cached }; } },
     ];
     await expect(runPipeline(l, run, steps(true))).rejects.toThrow("boom");
     expect(l.getRun(run)!.status).toBe("failed");

@@ -3,7 +3,7 @@ if (existsSync(".env")) { try { process.loadEnvFile(".env"); } catch { /* ignore
 import { Ledger } from "./ledger/ledger.js";
 import { runPipeline } from "./runner/pipeline.js";
 import { RequestSchema } from "./core/types.js";
-import { buildPipeline } from "./pipeline.js";
+import { buildBuyerPipeline as buildPipeline } from "./buyer/pipeline.js";
 
 const [cmd, ...rest] = process.argv.slice(2);
 const flags: Record<string, string> = {};
@@ -17,7 +17,7 @@ async function main() {
     const request = RequestSchema.parse({
       product: flags.product, target_country: flags.country,
       min_headcount: flags.min ? Number(flags.min) : undefined, max_headcount: flags.max ? Number(flags.max) : undefined,
-      fob_price_usd: flags.fob ? Number(flags.fob) : undefined, hs_code: flags.hs,
+      fob_price_usd: flags.fob ? Number(flags.fob) : undefined, hs_code: flags.hs, notes: flags.notes, client_name: flags.client, origin_country: flags.origin, do_not_contact: flags.exclude ? flags.exclude.split(",") : undefined,
     });
     const runId = ledger.createRun(request);
     log(`run ${runId}`);
@@ -31,7 +31,7 @@ async function main() {
     const outputs = await runPipeline(ledger, runId, buildPipeline(), { log });
     console.log(JSON.stringify({ run_id: runId, report: outputs.report, ledger: ledger.totals(runId) }, null, 2));
   } else if (cmd === "retry") {
-    const runId = positional[0]; const from = flags.from ?? "search";
+    const runId = positional[0]; const from = flags.from ?? "research";
     if (!runId) throw new Error("usage: retry <run-id> --from <step>");
     const steps = buildPipeline().map(s => s.name);
     ledger.resetStepsFrom(runId, from, steps);
@@ -57,11 +57,26 @@ async function main() {
   } else if (cmd === "approve" || cmd === "reject") {
     ledger.decideAction(positional[0], cmd === "approve" ? "approved" : "rejected");
     console.log(JSON.stringify(ledger.getAction(positional[0]), null, 2));
+  } else if (cmd === "select") {
+    const [runId, ...picks] = positional;
+    const leads: any[] = ledger.stepOutput<any>(runId, "shortlist")?.output?.leads ?? [];
+    // lead ids, or positions in the shortlist
+    const ids = picks.map(p => (/^\d{1,2}$/.test(p) ? leads[Number(p) - 1]?.lead_id : p));
+    if (!ids.length || ids.length > 5 || !ids.every(id => leads.some(l => l.lead_id === id))) throw new Error("usage: select <run-id> <1 to 5 lead ids or positions>");
+    ledger.setSelection(runId, ids);
+    const outputs = await runPipeline(ledger, runId, buildPipeline(), { log });
+    console.log(JSON.stringify({ run_id: runId, report: outputs.report, ledger: ledger.totals(runId) }, null, 2));
+  } else if (cmd === "limits") {
+    console.log(JSON.stringify(ledger.spendToday(), null, 2));
+  } else if (cmd === "reconcile") {
+    if (positional[1] !== "done" && positional[1] !== "not-done") throw new Error("usage: reconcile <action-id> done|not-done");
+    ledger.reconcileAction(positional[0], positional[1]);
+    console.log(JSON.stringify(ledger.getAction(positional[0]), null, 2));
   } else if (cmd === "execute") {
     const { executeApproved } = await import("./actions/execute.js");
     console.log(JSON.stringify(await executeApproved(ledger, positional[0]), null, 2));
   } else {
-    console.log(`usage:\n  run --product <text> --country <name|ISO3> [--min 20 --max 2000 --fob 12.5]\n  resume <run-id>\n  ledger <run-id>\n  runs\n  approve|reject <action-id>`);
+    console.log(`usage:\n  run --product <text> --country <name|ISO3> [--min 20 --max 2000 --fob 12.5]\n  resume <run-id>\n  ledger <run-id>\n  runs\n  approve|reject <action-id>\n  reconcile <action-id> done|not-done\n  limits`);
   }
 }
 main().catch(err => { console.error(err?.stack ?? err); process.exit(1); });

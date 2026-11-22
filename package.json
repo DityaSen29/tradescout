@@ -10,6 +10,7 @@
     "resume": "tsx src/cli.ts resume",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "setup": "mkdir -p data/raw && curl -fsSL -o data/raw/H6.json https://comtradeapi.un.org/files/v1/app/reference/H6.json && curl -fsSL -o data/raw/partnerAreas.json https://comtradeapi.un.org/files/v1/app/reference/partnerAreas.json",
     "api": "tsx src/api/server.ts"
   },
   "engines": {

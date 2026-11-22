@@ -4,9 +4,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { extname, join, normalize } from "node:path";
 import { Ledger } from "../ledger/ledger.js";
 import { runPipeline } from "../runner/pipeline.js";
-import { buildPipeline } from "../pipeline.js";
+import { buildBuyerPipeline as buildPipeline } from "../buyer/pipeline.js";
+import { editDraft } from "../buyer/edit.js";
+import { MAX_SELECTED } from "../buyer/select.js";
 import { RequestSchema } from "../core/types.js";
-import { emit, subscribe, history } from "./events.js";
+import { emit, reopen, subscribe, history } from "./events.js";
+import { STAGES } from "../buyer/contract.js";
+import { executeDraft, Outreach, outreachRoutes, startWorker } from "../outreach/index.js";
+import { createCrmRouter, crmFor, startPolling, syncLeads } from "../crm/index.js";
 import { executeApproved } from "../actions/execute.js";
 
 /**
@@ -24,22 +29,53 @@ import { executeApproved } from "../actions/execute.js";
  *   GET  /                         static frontend from ./public
  */
 const PORT = Number(process.env.PORT ?? 8787);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"].map(h => `${h}:${PORT}`));
 const ledger = new Ledger();
 const running = new Set<string>();
+/** A failure the screen can act on, without reading error text. */
+function failureOf(run: { status: string }, steps: any[]) {
+  if (run.status !== "failed" && run.status !== "budget_exceeded") return null;
+  const s = steps.find(x => x.status === "failed");
+  const message = String(s?.error ?? "").split("\n")[0];
+  const type = run.status === "budget_exceeded" ? "budget" : /needs input/.test(message) ? "needs_input" : /cannot verify/.test(message) ? "cannot_verify"
+    : /fetch failed|timeout|aborted/i.test(message) ? "network" : /\b429\b/.test(message) ? "rate_limited" : /\b40[123]\b/.test(message) ? "provider_refused" : "internal";
+  return { type, step: s?.name ?? null, message, resumable: ["network", "rate_limited", "internal", "provider_refused"].includes(type) };
+}
+const crm = createCrmRouter(crmFor(ledger));
+if (process.env.HUBSPOT_TOKEN) startPolling(crmFor(ledger));
+// Email goes only to the exact team inboxes listed here. With none listed, an approved draft is written to a file.
+const emailTestMode = !!process.env.OUTREACH_TEST_RECIPIENTS?.trim();
+const outreach = new Outreach(ledger);
+const handleOutreach = outreachRoutes(ledger, outreach);
+if (emailTestMode) startWorker(outreach);
+
+const MODULES = [
+  { id: "buyer_desk", name: "Find, prove and approach buyers", status: "live" },
+  { id: "crm_sync", name: "Two-way CRM sync", status: crmFor(ledger).configured() ? "configured" : "needs_connection" },
+  { id: "outreach", name: "Campaign runner, mailbox health and alerts", status: emailTestMode ? "test_inboxes_only" : "needs_connection" },
+  { id: "buyer_intelligence", name: "Buyer intelligence", status: "coming_next", label: "Feature 2", description: "Reorder rhythm, next buying window, share of wallet and supplier switching, from import records" },
+];
+/** Rupees are estimates: set the two rates from your own invoices. */
+function costOf(t: { credits_used: number; model_cost_usd: number }) {
+  return { estimated_inr: Number((t.credits_used * Number(process.env.INR_PER_CRUSTDATA_CREDIT ?? 0.83) + t.model_cost_usd * Number(process.env.INR_PER_USD ?? 90)).toFixed(2)) };
+}
 
 function start(runId: string, mode: "run" | "resume") {
   if (running.has(runId)) return;
   running.add(runId);
-  if (mode === "resume") process.env.TRADESCOUT_KILLED = "1";
+  if (mode === "resume") { process.env.TRADESCOUT_KILLED = "1"; reopen(runId); }
   runPipeline(ledger, runId, buildPipeline(), {
-    log: (m) => emit(runId, { type: "log", message: m }),
+    log: (m) => {
+      const a = m.match(/^agent:([\w-]+): ([\s\S]*)$/);
+      emit(runId, a ? { type: "agent", agent: a[1], message: a[2] } : { type: "log", message: m });
+    },
     onStep: (name, status, info) => emit(runId, { type: "step", name, status, info: status === "done" ? undefined : info }),
-  }).then(() => emit(runId, { type: "done" }))
+  }).then(() => emit(runId, { type: "done", status: ledger.getRun(runId)?.status }))
     .catch((err) => emit(runId, { type: "error", message: String(err?.message ?? err) }))
     .finally(() => running.delete(runId));
 }
 
-const json = (res: ServerResponse, code: number, body: unknown) => { res.writeHead(code, { "content-type": "application/json", "access-control-allow-origin": "*" }); res.end(JSON.stringify(body)); };
+const json = (res: ServerResponse, code: number, body: unknown) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
 const readBody = (req: IncomingMessage) => new Promise<any>((resolve, reject) => { let s = ""; req.on("data", c => s += c); req.on("end", () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } }); });
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 /** Depth-first search of a stored response for the record whose id fields match. */
@@ -57,7 +93,13 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const p = url.pathname; const m = req.method ?? "GET";
   try {
-    if (m === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
+    if (await handleOutreach(req, res)) return;
+    if (await crm(req, res)) return;      // it applies the same local-only guard itself
+    // approvals and paid runs are local only: no other site, and no rebound hostname, may drive them
+    const origin = req.headers.origin;
+    if (!LOCAL_HOSTS.has(req.headers.host ?? "") || (origin && origin !== `http://${req.headers.host}`)) return json(res, 403, { error: "local requests only" });
+    if (p === "/api/modules" && m === "GET") return json(res, 200, { modules: MODULES, stages: STAGES, outreach_mode: "approval" });
+    if (p === "/api/limits" && m === "GET") return json(res, 200, ledger.spendToday());
     if (p === "/api/health") return json(res, 200, { ok: true, running: [...running], time: new Date().toISOString() });
     if (p === "/api/runs" && m === "POST") {
       const body = RequestSchema.parse(await readBody(req));
@@ -70,11 +112,31 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)$/)) && m === "GET") {
       const id = mm[1]; const run = ledger.getRun(id); if (!run) return json(res, 404, { error: "no such run" });
       const report = ledger.stepOutput<any>(id, "report")?.output ?? null;
-      return json(res, 200, { run, steps: ledger.listSteps(id), totals: ledger.totals(id), actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
+      const shortlist = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
+      const trace = ["plan", "customs", "research", "shortlist", "contacts", "write"].flatMap(s => ledger.stepOutput<any>(id, s)?.output?.trace ?? []);
+      const plan = ledger.stepOutput<any>(id, "plan")?.output ?? null;
+      // one object for a screen: coverage, what each call cost, why each lead is trusted
+      const cu = ledger.stepOutput<any>(id, "customs")?.output;
+      const coverage = cu ? { customs: cu.coverage, rows_in_market: cu.rows_in_market, rows_matched: cu.rows_matched, researched: !!cu.needs_research } : null;
+      const calls = ledger.listCalls(id).map((c: any) => ({ step: c.step, endpoint: c.endpoint, status: c.status, credits: c.credits, model_cost_usd: c.model_cost_usd, latency_ms: c.latency_ms, at: c.retrieved_at }));
+      const trust = Object.fromEntries(shortlist.map((l: any) => [l.lead_id, {
+        label: l.match, reason: l.related_party ? `${l.match_reason}; related party, ranked last` : l.match_reason,
+        record_dates: l.behaviour ? { first: l.behaviour.first_month || null, last: l.behaviour.last_month || null } : null,
+        retrieved_at: l.claims[0]?.retrieved_at ?? null }]));
+      const byStep = new Map<string, { step: string; calls: number; failed: number; inr: number }>();
+      for (const c of calls) {
+        const e = byStep.get(c.step) ?? { step: c.step, calls: 0, failed: 0, inr: 0 };
+        e.calls++; if (c.status === "error") e.failed++;
+        e.inr += costOf({ credits_used: c.credits, model_cost_usd: c.model_cost_usd }).estimated_inr;
+        byStep.set(c.step, e);
+      }
+      const spent = [...byStep.values()].reduce((n, e) => n + e.inr, 0);
+      const step_costs = [...byStep.values()].map(e => ({ ...e, inr: Number(e.inr.toFixed(2)), share: spent ? Number((e.inr / spent).toFixed(3)) : 0 }));
+      return json(res, 200, { step_costs, failure: failureOf(run, ledger.listSteps(id)), paused_all: ledger.isPaused(), coverage, calls, trust, shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", "access-control-allow-origin": "*" });
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
       let closed = false; let unsub: () => void = () => {};
       const listener = (e: any) => {
         if (closed) return;
@@ -85,7 +147,22 @@ const server = createServer(async (req, res) => {
       req.on("close", () => { closed = true; unsub(); }); return;
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/resume$/)) && m === "POST") { const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" }); start(id, "resume"); return json(res, 202, { run_id: id, resumed: true }); }
-    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "search", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "search" }); }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/select$/)) && m === "POST") {
+      const id = mm[1];
+      if (running.has(id)) return json(res, 409, { error: "the run is still working" });
+      const leads: any[] = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
+      const ids = (await readBody(req)).lead_ids;
+      if (!Array.isArray(ids) || !ids.length || ids.length > MAX_SELECTED || !ids.every(x => leads.some(l => l.lead_id === x))) return json(res, 400, { error: `pick 1 to ${MAX_SELECTED} companies from the shortlist` });
+      ledger.setSelection(id, ids);
+      start(id, "resume");
+      return json(res, 202, { run_id: id, selected: ids.length });
+    }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/sync$/)) && m === "POST") {
+      const leads = ledger.stepOutput<any>(mm[1], "report")?.output?.leads?.filter((l: any) => l.selected);
+      if (!leads?.length) return json(res, 409, { error: "nothing to sync until the selected companies are enriched" });
+      return json(res, 200, await syncLeads(ledger, mm[1], leads));
+    }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "research", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "research" }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/ledger$/)) && m === "GET") return json(res, 200, { calls: ledger.listCalls(mm[1]), totals: ledger.totals(mm[1]), run: ledger.getRun(mm[1]) });
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/evidence$/)) && m === "GET") return json(res, 200, ledger.listEvidence(mm[1]));
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/record$/)) && m === "GET") {
@@ -102,10 +179,39 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: `record ${id} not found in stored responses for ${endpoint}` });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph }); }
+    if (p === "/api/pause" && m === "GET") return json(res, 200, { paused: ledger.isPaused() });
+    if (p === "/api/pause" && m === "POST") {
+      const { paused } = await readBody(req);
+      if (typeof paused !== "boolean") return json(res, 400, { error: "paused is true or false" });
+      ledger.setPaused(paused);
+      return json(res, 200, { paused });
+    }
+    if (p === "/api/actions/batch-approve" && m === "POST") {
+      const { items } = await readBody(req);
+      if (!Array.isArray(items) || !items.length || items.length > 50) return json(res, 400, { error: "items is 1 to 50 of {id, draft_hash}" });
+      return json(res, 200, { results: items.map((i: any) => ledger.approveExact(String(i?.id ?? ""), String(i?.draft_hash ?? ""))) });
+    }
+    if ((mm = p.match(/^\/api\/actions\/([^/]+)\/undo$/)) && m === "POST") {
+      return ledger.undoDecision(mm[1]) ? json(res, 200, ledger.getAction(mm[1])) : json(res, 409, { error: "nothing to undo, or it has already gone out" });
+    }
+    if ((mm = p.match(/^\/api\/actions\/([^/]+)\/edit$/)) && m === "POST") {
+      const b = await readBody(req);
+      if (![b.subject, b.text, b.draft_hash].every(x => typeof x === "string") || b.text.length > 3000) return json(res, 400, { error: "send subject, text (the body without greeting and sign-off) and draft_hash" });
+      const r = await editDraft(ledger, mm[1], b);
+      return json(res, r.ok ? 200 : 422, r);
+    }
     if ((mm = p.match(/^\/api\/actions\/([^/]+)\/(approve|reject|execute)$/)) && m === "POST") {
       const [, id, verb] = mm;
-      if (verb === "execute") return json(res, 200, await executeApproved(ledger, id));
-      ledger.decideAction(id, verb === "approve" ? "approved" : "rejected");
+      if (verb === "execute") {
+        if (ledger.isPaused()) return json(res, 200, { ran: false, reason: "Everything is paused. Resume before executing." });
+        if (emailTestMode && ledger.getAction(id)?.kind === "email_draft") {
+          const r = await executeDraft(ledger, id);
+          return json(res, 200, { ...r, ran: r.sent, action: ledger.getAction(id) });
+        }
+        return json(res, 200, await executeApproved(ledger, id));
+      }
+      const why = verb === "reject" ? (await readBody(req)).reason : undefined;
+      ledger.decideAction(id, verb === "approve" ? "approved" : "rejected", "person", typeof why === "string" ? why.slice(0, 300) : undefined);
       return json(res, 200, ledger.getAction(id));
     }
     // static frontend
@@ -122,4 +228,4 @@ const server = createServer(async (req, res) => {
 });
 process.on("uncaughtException", (e) => console.error("uncaught:", e));
 process.on("unhandledRejection", (e) => console.error("unhandled:", e));
-server.listen(PORT, () => console.log(`TradeScout API on http://localhost:${PORT}`));
+server.listen(PORT, "127.0.0.1", () => console.log(`TradeScout API on http://localhost:${PORT}`));

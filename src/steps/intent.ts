@@ -1,4 +1,5 @@
 import type { StepCtx } from "../runner/pipeline.js";
+import { MAX_CREDITS } from "../core/limits.js";
 import type { LayerResult } from "../core/types.js";
 import { and, f, or } from "../sources/crustdata.js";
 import { crust, apiEvidence, BUYING_TITLE } from "./common.js";
@@ -13,9 +14,9 @@ export async function intentStep(ctx: StepCtx): Promise<LayerResult<Record<strin
   const evidence: LayerResult["evidence"] = [];
   let credits = 0, latency = 0;
   if (!ids.length) return { layer: "intent", status: "unavailable", reason: "no candidates", evidence, credits: 0, latency_ms: 0 };
-  const r = await ctx.call({ source: "crustdata", endpoint: "/job/search", request: { ids, limit: 50 }, credits: (x: any) => x.credits }, async () => {
+  const r = await ctx.call({ source: "crustdata", endpoint: "/job/search", request: { ids, limit: 50 }, maxUnits: MAX_CREDITS.jobSearch(50), credits: (x: any) => x.credits }, async () => {
     const x = await crust().jobSearch({ filters: and(f("company.basic_info.crustdata_company_id", "in", ids.map(Number)), f("job_details.title", "is_not_null", true)), fields: ["job_details.title", "company.basic_info.crustdata_company_id", "metadata.date_added"], limit: 50 });
-    return { jobs: x.data.jobs ?? x.data.results ?? x.data.items ?? [], credits: x.credits, retrieved_at: x.retrieved_at };
+    return { jobs: x.data.job_listings ?? x.data.jobs ?? x.data.results ?? x.data.items ?? [], credits: x.credits, retrieved_at: x.retrieved_at };
   });
   credits += r.credits; latency += r.latency_ms;
   const retrieved_at = r.data.retrieved_at ?? r.retrieved_at;
