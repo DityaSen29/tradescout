@@ -12,7 +12,7 @@ export const RequestSchema = z.object({
 });
 export type TradeRequest = z.infer<typeof RequestSchema>;
 
-export const SourceType = z.enum(["crustdata", "comtrade", "wits", "sanctions", "web", "user", "ledger"]);
+export const SourceType = z.enum(["crustdata", "comtrade", "wits", "sanctions", "web", "customs", "user", "ledger"]);
 export type SourceType = z.infer<typeof SourceType>;
 
 /** Every claim carries one of these. No evidence, no claim. */

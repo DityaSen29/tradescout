@@ -5,7 +5,7 @@
  */
 export const PAID_PROVIDERS = ["crustdata", "apollo", "llm"] as const;
 export type PaidProvider = (typeof PAID_PROVIDERS)[number];
-const FREE_SOURCES = new Set(["comtrade", "wits"]);
+const FREE_SOURCES = new Set(["comtrade", "wits", "customs", "dns", "gmail", "hubspot", "zoho", "telegram"]);
 
 const SETTINGS: Record<PaidProvider, { run: [string, number]; day: [string, number] }> = {
   crustdata: { run: ["RUN_CREDIT_LIMIT", 150], day: ["CRUSTDATA_DAILY_LIMIT", 1500] },
