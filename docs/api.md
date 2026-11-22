@@ -10,7 +10,7 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 
 | Call | Body | Returns |
 |---|---|---|
-| `POST /api/runs` | `{product, target_country, client_name?, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
+| `POST /api/runs` | `{product, target_country, client_name?, origin_country?, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
 | `GET /api/runs/:id/events` | | SSE, below |
 | `GET /api/runs/:id` | | `{run, running, steps, totals, coverage, calls, trust (by lead_id: label, reason, record_dates, retrieved_at), plan, trace, shortlist: Lead[], max_selected, actions, report}` |
 | `POST /api/runs/:id/select` | `{lead_ids: string[]}`, 1 to 5 | resumes the run: contacts, emails, drafts |
@@ -44,6 +44,8 @@ Each has `seq` and `at`. History replays on connect. After `done` or `error` the
 After a server restart the live history is gone. `trace` on `GET /api/runs/:id` has it.
 
 ## Rules a frontend must keep
+
+- `plan.seller_origin` is `{iso3, name, source, quote}`. `source` is `request` (the field), `prompt` (read from the brief, with the quote) or `default` (assumed for ranking only, so don't present it as the seller's origin).
 
 - `import_record` is the only label that may say "imports". `product_match` means evidence of product use, with no import proof.
 - `behaviour` and claims with `shareable: false` are internal to the seller. Never show them in buyer-facing text.

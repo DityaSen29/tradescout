@@ -6,6 +6,7 @@ import { hashOf } from "../ledger/ledger.js";
 import type { Claim, Lead, OutreachDraft } from "./contract.js";
 import type { Plan } from "./plan.js";
 import { onDoNotContact } from "./select.js";
+import { DEFAULT_ORIGIN, productNoun, sellerClaim } from "./origin.js";
 import { tracer, type Trace } from "./common.js";
 
 const Draft = z.object({ key: z.string(), subject: z.string().min(3).max(120), sentences: z.array(z.object({ text: z.string().min(3), claim_ids: z.array(z.string()) })).min(2).max(8) });
@@ -48,7 +49,7 @@ export async function writeStep(ctx: StepCtx): Promise<{ proposed: number; block
   const blocked: { lead_id: string; problems: string[] }[] = [];
   if (!leads.length) { say("copywriter", "No selected company has a decision-maker, so nothing was written."); return { proposed: 0, blocked, trace }; }
 
-  const seller = [{ id: "seller1", text: `We supply ${ctx.request.product} from India.` }, ...(ctx.request.notes ? [{ id: "seller2", text: ctx.request.notes }] : [])];
+  const seller = [{ id: "seller1", text: sellerClaim(productNoun(ctx.request.product, plan.product_name), plan.seller_origin ?? DEFAULT_ORIGIN) }, ...(ctx.request.notes ? [{ id: "seller2", text: ctx.request.notes }] : [])];
   const jobs = leads.map((lead, i) => {
     const facts: Claim[] = lead.claims.filter(c => c.verdict === "accepted" && c.shareable);
     return { key: `L${i + 1}`, lead, claims: [...seller, ...facts.map(c => ({ id: c.id, text: `${c.text} | source says: ${c.quote}` }))], done: null as D | null, problems: [] as string[] };
@@ -58,7 +59,7 @@ export async function writeStep(ctx: StepCtx): Promise<{ proposed: number; block
     if (!open.length) break;
     say("copywriter", attempt ? `Rewriting ${open.length} rejected draft(s)` : `Writing ${open.length} emails, each from that buyer's own evidence`);
     const w = await askJson(ctx, { agent: "copywriter", schema: Drafts, maxOut: 4000,
-      task: `You write first emails from an Indian exporter to buyers abroad. Write like a thoughtful senior export manager: plain, specific, warm, 60 to 110 words, no hype, no flattery, no "I hope this finds you well".
+      task: `You write first emails from an exporter to buyers abroad. State where the exporter ships from only if a seller claim says it. Write like a thoughtful senior export manager: plain, specific, warm, 60 to 110 words, no hype, no flattery, no "I hope this finds you well".
 For each buyer:
 1. Open on something specific to that company from its claims, in your own words, and why it makes this product relevant to them. Don't paste their description back.
 2. Say what we supply, using only the seller claims. Invent no certification, price, capacity, client or location.

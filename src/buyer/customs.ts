@@ -10,6 +10,7 @@ import { newLead, tracer, type Trace } from "./common.js";
 import type { BuyingBehaviour, Lead } from "./contract.js";
 import type { Plan, CustomsQuery } from "./plan.js";
 import { customsSource } from "./customs-source.js";
+import { DEFAULT_ORIGIN } from "./origin.js";
 
 /** One line of an export file, as written by scripts/import-exports.py. */
 export interface Row {
@@ -73,12 +74,17 @@ export function isClient(supplier: string | null, client: string | undefined): b
   return c.length >= 5 && s.length >= 5 && (s.startsWith(c) || c.startsWith(s));
 }
 const SHARED_WORDS = new Set("american national international global united universal general natural pacific premier royal north south east west eastern western central golden star shanghai china india indian menthol mint aroma aromatics aromatic chemical chemicals pharma steel trading industries the".split(" "));
-/** A US arm buying from its Indian parent is not an open buyer. Judged on the distinctive start of both names. */
+/** An overseas arm buying from its parent is not an open buyer. Judged on the distinctive start of both names. */
 export function isRelatedParty(importer: string, supplier: string | null): boolean {
   if (!supplier) return false;
   const a = cleanName(importer).split(" "), b = cleanName(supplier).split(" ");
   if (!a[0] || a[0] !== b[0]) return false;
   return (a[0].length >= 4 && !SHARED_WORDS.has(a[0])) || (!!a[1] && a[1] === b[1]);
+}
+
+/** Does this importer already buy from the seller's country? */
+export function buysFrom(rows: Pick<Row, "origin">[], iso3: string): boolean {
+  return rows.some(r => !!r.origin && rowCountry(r.origin) === iso3);
 }
 
 export interface CustomsOutput {
@@ -137,6 +143,7 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
   }
   const leads: Lead[] = [];
   const client = ctx.request.client_name;
+  const origin = plan.seller_origin ?? DEFAULT_ORIGIN;
   if (!client) say("policy", "No client company name in the brief, so importers the client already supplies cannot be excluded.");
   let own = 0, related = 0;
   for (const rows of groups.values()) {
@@ -145,7 +152,7 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     const used = matched.length ? matched : rows;
     const b = behaviourOf(used);
     const score = Math.round((matched.length ? 45 : 20) + Math.min(20, 5 * Math.log2(1 + used.length)) + Math.min(20, b.months_active * 4)
-      + (b.origins.some(o => /india/i.test(o)) ? 10 : 0) + (b.total_value_usd || b.net_weight_kg ? 5 : 0));
+      + (buysFrom(used, origin.iso3) ? 10 : 0) + (b.total_value_usd || b.net_weight_kg ? 5 : 0));
     const lead = newLead(ctx, { name: rows[0].importer.trim(), iso3: plan.country.iso3, hs: [...new Set(used.map(x => x.hs.slice(0, 6)))],
       match: matched.length ? "import_record" : "category_match", score,
       reason: matched.length ? `${matched.length} import record(s) whose description is this product` : "imports under the HS code; the description is blank or a different product" });
