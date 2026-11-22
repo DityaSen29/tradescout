@@ -94,6 +94,13 @@ export class Ledger {
   failStep(runId: string, name: string, error: string) {
     this.db.prepare(`UPDATE steps SET status='failed', finished_at=?, error=? WHERE run_id=? AND name=?`).run(now(), error, runId, name);
   }
+  /** Forget checkpoints from `name` onward so they re-run; memoised calls stay, so nothing is paid twice. */
+  resetStepsFrom(runId: string, name: string, order: string[]) {
+    const idx = order.indexOf(name); if (idx < 0) throw new Error(`unknown step ${name}`);
+    for (const n of order.slice(idx)) this.db.prepare(`DELETE FROM steps WHERE run_id=? AND name=?`).run(runId, n);
+    this.db.prepare(`DELETE FROM actions WHERE run_id=? AND status='proposed'`).run(runId); // un-decided proposals are re-derived; decided ones stay
+    this.setRunStatus(runId, "running");
+  }
   listSteps(runId: string) {
     return this.db.prepare(`SELECT name, status, started_at, finished_at, attempts, error FROM steps WHERE run_id=? ORDER BY started_at`).all(runId) as any[];
   }

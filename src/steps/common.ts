@@ -14,7 +14,7 @@ export const iso3Of = (raw: string | null) => (raw ? resolveCountry(raw)?.iso3 ?
 
 export const SEARCH_FIELDS = [
   "basic_info.name", "basic_info.primary_domain", "basic_info.website", "basic_info.description", "basic_info.year_founded",
-  "basic_info.professional_network_url", "basic_info.industries", "locations.country", "locations.city", "locations.headquarters",
+  "basic_info.professional_network_url", "basic_info.employee_count_range", "locations.country", "locations.city", "locations.headquarters", "taxonomy.professional_network_industries",
   "headcount.total", "headcount.growth_percent.6m", "headcount.growth_percent.12m",
 ];
 export const BUYING_TITLE = /\b(procure|purchas|sourcing|buyer|buying|supply chain|category|import|merchandis|einkauf|achats|acquisti|compras)\w*/i;

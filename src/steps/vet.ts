@@ -22,7 +22,13 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
       const r = await ctx.call({ source: "crustdata", endpoint: "/company/enrich", request: { ids, fields: ["basic_info", "headcount", "funding", "news"] }, credits: (x: any) => x.credits },
         async () => { const x = await crust().companyEnrich({ ids, fields: ["basic_info", "headcount", "funding", "news"] }); return { items: x.data.companies ?? x.data.items ?? (Array.isArray(x.data) ? x.data : []), credits: x.credits, retrieved_at: x.retrieved_at }; });
       retrieved_at = r.data.retrieved_at ?? r.retrieved_at;
-      for (const raw of r.data.items as any[]) { const c = flattenCompany(raw); if (c.company_id) records.set(c.company_id, { raw, c }); }
+      for (const item of r.data.items as any[]) {
+        const match = Array.isArray(item?.matches) ? item.matches[0] : item;           // enrich: { matched_on, match_type, matches: [{ confidence_score, company_data }] }
+        const raw = match?.company_data ?? match;
+        if (!raw) continue;
+        const c = flattenCompany(raw);
+        if (c.company_id) records.set(c.company_id, { raw, c, confidence: match?.confidence_score ?? null });
+      }
       enrichedIds = [...records.keys()];
       ctx.log(`vet: enriched ${enrichedIds.length}/${ids.length} (${r.cached ? "memo" : `${r.credits} credits`})`);
     } catch (err: any) { notes.push(`enrich unavailable: ${err?.message ?? err}`); ctx.log(`vet: enrich failed (${err?.message ?? err}); tiers fall back to AMBER insufficient data`); }
@@ -37,7 +43,8 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
     if (rec) {
       const c = rec.c;
       Object.assign(cand, { headcount: c.headcount ?? cand.headcount, growth_6m: c.growth_6m ?? cand.growth_6m, growth_12m: c.growth_12m ?? cand.growth_12m, year_founded: c.year_founded ?? cand.year_founded, domain: c.domain ?? cand.domain, description: c.description ?? cand.description, industries: c.industries.length ? c.industries : cand.industries });
-      const news: any[] = (c.news ?? []).filter((n: any) => { const d = n.date ?? n.published_at ?? n.publish_date; return !d || new Date(d) >= since; });
+      const newsRaw: any = rec.raw.news; const newsList: any[] = Array.isArray(newsRaw) ? newsRaw : Array.isArray(newsRaw?.items) ? newsRaw.items : Array.isArray(newsRaw?.articles) ? newsRaw.articles : [];
+      const news: any[] = newsList.filter((n: any) => { const d = n.date ?? n.published_at ?? n.publish_date; return !d || new Date(d) >= since; });
       const adverseItems = news.filter(n => ADVERSE.test(`${n.title ?? ""} ${n.summary ?? n.description ?? ""}`));
       adverse = adverseItems.length;
       for (const n of adverseItems.slice(0, 3)) if (n.url) cand.evidence.push({ claim: `adverse news: ${n.title}`, source_type: "web", source_url: n.url, record_date: n.date ?? n.published_at ?? null, retrieved_at });

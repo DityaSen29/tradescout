@@ -30,6 +30,15 @@ async function main() {
     log(`resuming ${runId}`);
     const outputs = await runPipeline(ledger, runId, buildPipeline(), { log });
     console.log(JSON.stringify({ run_id: runId, report: outputs.report, ledger: ledger.totals(runId) }, null, 2));
+  } else if (cmd === "retry") {
+    const runId = positional[0]; const from = flags.from ?? "search";
+    if (!runId) throw new Error("usage: retry <run-id> --from <step>");
+    const steps = buildPipeline().map(s => s.name);
+    ledger.resetStepsFrom(runId, from, steps);
+    process.env.TRADESCOUT_KILLED = "1";
+    log(`retrying \${runId} from \${from} (memoised calls are free)`);
+    const outputs = await runPipeline(ledger, runId, buildPipeline(), { log });
+    console.log(JSON.stringify({ run_id: runId, report: outputs.report, ledger: ledger.totals(runId) }, null, 2));
   } else if (cmd === "ledger") {
     const runId = positional[0];
     console.log(JSON.stringify({ run: ledger.getRun(runId), steps: ledger.listSteps(runId), calls: ledger.listCalls(runId), totals: ledger.totals(runId), actions: ledger.listActions(runId) }, null, 2));
