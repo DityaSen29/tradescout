@@ -792,6 +792,7 @@ function follow(){
 /* Presenter shortcut: ?seed=done opens a finished run. */
 if(!LIVE&&QS.get('seed')==='done'){S=fresh();S.t0=Date.now();enter(1);for(let i=0;i<200&&S.step<8;i++){if(S.wait==='codes')enter(3);else if(S.wait==='segs')enter(5);else{const o=ops(S.step).find(x=>!S.done[x.k]);if(!o){if(S.step===2){S.wait='codes'}else if(S.step===4){S.wait='segs'}else if(S.step===7){S.step=8;S.running=false}else enter(S.step+1)}else{S.credits+=o.cr;led(o.ep,o.cr,'ok',o.k);S.done[o.k]=1;logL(o.say)}}}S.launched=true;S.view='today';save();QS.delete('seed');history.replaceState(null,'',location.pathname+(QS.size?'?'+QS:''))}
 if(LIVE){
+ SRC.c=['Crustdata work email, with its status','person enrich',''];
  $('#tag').hidden=true;S.req='';try{const q=sessionStorage.getItem('meridian.q');if(q){sessionStorage.removeItem('meridian.q');S.req=q;setTimeout(()=>{render();$('[data-a=find]')?.click()},300)}}catch(e){}
  api('/pause').then(d=>{S.off=!!d.paused;bg()}).catch(()=>{});
  api('/runs').then(r=>{L.runs=r;const id=QS.get('run');if(id&&r.some(x=>x.id===id)){L.id=id;follow();poll()}else render()}).catch(e=>{L.err='No backend here. Serve this file from the tradescout server. '+e.message;render()});
