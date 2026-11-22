@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:14 PM IST on 22 November 2026, at commit [`6000c04`](https://github.com/shivanshpilani/tradescout/commit/6000c04).
+Every capability in this document carries one of these labels. Status is as of 6:17 PM IST on 22 November 2026, at commit [`f95a3fd`](https://github.com/shivanshpilani/tradescout/commit/f95a3fd).
 
 | Label | Meaning |
 |---|---|
@@ -199,9 +199,9 @@ The origin reading, added at 6:08 PM, ran live through planning and customs for 
 
 ### How we tested it
 
-On a fresh clone at `6000c04`, with Node 22.14:
+On a fresh clone at `f95a3fd`, with Node 22.14:
 
-- **234 automated tests in eleven files pass**, with a one-line stand-in for one public OFAC reference file that isn't bundled (see the [run instructions](#tests)). They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
+- **235 automated tests in twelve files pass**, with a one-line stand-in for one public OFAC reference file that isn't bundled (see the [run instructions](#tests)). They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
