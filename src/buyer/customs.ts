@@ -125,11 +125,16 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
   const descs = all.slice(0, DESC_MAX);
   if (all.length > descs.length) say("customs", `${all.length - descs.length} descriptions were not read: over the ${DESC_MAX} limit, so those records stay category-only`);
   const exact = new Set<string>();
-  for (let at = 0; at < descs.length; at += DESC_BATCH) {
-    const batch = descs.slice(at, at + DESC_BATCH);
-    const j = await askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 3000,
+  const batches: { at: number; batch: string[] }[] = [];
+  for (let at = 0; at < descs.length; at += DESC_BATCH) batches.push({ at, batch: descs.slice(at, at + DESC_BATCH) });
+  const judged = await Promise.allSettled(batches.map(({ batch }) => askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 3000,
       task: `You decide which shipment descriptions are this exact product. A description that only fits the broad HS heading is not a match. Return {"matches":[indexes of exact matches], "reasoning": one sentence}.`,
-      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: batch.map((text, index) => ({ index, text })) } });
+      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: batch.map((text, index) => ({ index, text })) } })));
+  // all batches have settled before one failure fails the step, so a resume never repeats a paid call still in flight
+  for (const [k, { at, batch }] of batches.entries()) {
+    const r = judged[k];
+    if (r.status === "rejected") throw r.reason;
+    const j = r.value;
     let n = 0;
     for (const i of new Set(j.matches)) if (batch[i] !== undefined) { exact.add(batch[i]); n++; }
     say("customs", `${n} of descriptions ${at + 1} to ${at + batch.length} are the exact product: ${j.reasoning}`);
