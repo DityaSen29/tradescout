@@ -8,7 +8,7 @@ export type PaidProvider = (typeof PAID_PROVIDERS)[number];
 const FREE_SOURCES = new Set(["comtrade", "wits"]);
 
 const SETTINGS: Record<PaidProvider, { run: [string, number]; day: [string, number] }> = {
-  crustdata: { run: ["RUN_CREDIT_LIMIT", 60], day: ["CRUSTDATA_DAILY_LIMIT", 1000] },
+  crustdata: { run: ["RUN_CREDIT_LIMIT", 150], day: ["CRUSTDATA_DAILY_LIMIT", 1500] },
   apollo: { run: ["APOLLO_RUN_LIMIT", 25], day: ["APOLLO_DAILY_LIMIT", 100] },
   llm: { run: ["LLM_RUN_LIMIT_USD", 0.5], day: ["LLM_DAILY_LIMIT_USD", 3] },
 };
@@ -41,6 +41,7 @@ export const MAX_CREDITS = {
   companySearch: (limit: number) => limit * (0.03 + 0.2 + 0.2 + 0.1), // base, headcount filter, headcount field, taxonomy field
   companyEnrich: (count: number) => count * 2,
   personSearch: (limit: number) => limit * (0.03 + 0.1 + 0.1),        // base, experience filter, experience field
+  personEnrichWorkEmail: (count: number) => count * 2,                 // base 1 + contact.business_emails 1
   jobSearch: (limit: number) => limit * 0.03,
   webSearch: (pages: number) => pages,
 };

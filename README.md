@@ -61,13 +61,13 @@ npx tsx src/cli.ts approve|reject|execute <action-id>
 TRADESCOUT_KILL_DURING=contacts npm run run -- --product "basmati rice" --country UAE   # simulate a crash
 ```
 
-Per-run ceilings: `RUN_TIME_LIMIT_MS` (default 240 s of active time per attempt) and `RUN_CREDIT_LIMIT` (default 60 credits).
+Per-run ceilings: `RUN_TIME_LIMIT_MS` (default 240 s of active time per attempt) and `RUN_CREDIT_LIMIT` (default 150 credits).
 
 ## Hard API limits
 
 | Provider | Per run | Per day (IST) | Variables |
 |---|---|---|---|
-| Crustdata | 60 credits | 1,000 credits | `RUN_CREDIT_LIMIT`, `CRUSTDATA_DAILY_LIMIT` |
+| Crustdata | 150 credits | 1,500 credits | `RUN_CREDIT_LIMIT`, `CRUSTDATA_DAILY_LIMIT` |
 | Apollo | 25 credits | 100 credits | `APOLLO_RUN_LIMIT`, `APOLLO_DAILY_LIMIT` |
 | LLM | $0.50 | $3 | `LLM_RUN_LIMIT_USD`, `LLM_DAILY_LIMIT_USD` |
 
