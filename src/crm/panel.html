@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM sync</title>
+<!-- Minimal on purpose: the product UI will replace this and use the same /api/crm endpoints. -->
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 760px; margin: 20px auto; padding: 0 16px; color: #1b2a41; background: #fff; }
+  li { margin-bottom: 10px; overflow-wrap: anywhere; } small { display: block; } button { margin: 4px 6px 0 0; }
+</style>
+<h1>CRM sync</h1>
+<p id="connection">Loading</p>
+<p id="error" role="alert"></p>
+<button id="sync">Sync now</button>
+<h2>Needs your decision</h2>
+<ul id="conflicts"></ul>
+<h2>Leads</h2>
+<ul id="leads"></ul>
+<script>
+const $ = (id) => document.getElementById(id);
+const el = (tag, text, parent) => { const e = document.createElement(tag); e.textContent = text; parent.append(e); return e; };
+const when = (ms) => (ms ? new Date(ms).toLocaleTimeString() : "never");
+let failed = "", shown = "";
+async function api(path, method = "GET") {
+  const r = await fetch(`/api/crm/${path}`, { method });
+  const body = await r.json();
+  if (!r.ok) throw new Error(body.error);
+  return body;
+}
+async function act(path) {
+  document.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  try { failed = (await api(path, "POST")).error || ""; } catch (e) { failed = e.message; }
+  shown = "";
+  await load(); $("sync").disabled = false;
+}
+async function load() {
+  try {
+    const [c, { conflicts }, { leads }] = await Promise.all([api("connection"), api("conflicts"), api("leads")]);
+    const state = { no_key: "no key yet", connected: "connected", error: "not connected", unchecked: "not checked yet" }[c.state];
+    $("connection").textContent = `${c.simulated ? "SIMULATED " : ""}HubSpot: ${state}. Last push ${when(c.last_push)}, last pull ${when(c.last_pull)}. ${c.calls_today.used} of ${c.calls_today.limit} API calls today. Zoho: stub.`;
+    $("error").textContent = failed || c.error || "";
+    const next = JSON.stringify([conflicts, leads]);
+    if (next === shown) return;   // rebuilding under the pointer loses clicks and keyboard focus
+    shown = next;
+    $("conflicts").replaceChildren(); $("leads").replaceChildren();
+    if (!conflicts.length) el("li", "Nothing to decide.", $("conflicts"));
+    for (const k of conflicts) {
+      const li = el("li", `${k.company || k.lead_id}: ${k.title}`, $("conflicts"));
+      el("small", k.detail, li);
+      for (const verb of ["approve", "reject"]) el("button", k.choices[verb], li).onclick = () => {
+        if (!k.needs_confirmation || confirm(`${k.choices[verb]}? ${k.detail}`)) act(`conflicts/${k.id}/${verb}`);
+      };
+    }
+    if (!leads.length) el("li", "No leads synced yet.", $("leads"));
+    for (const l of leads) el("li", `${l.company}: ${{ done: "synced", review: "needs you" }[l.state] || l.state}, CRM stage ${l.crm_owned.dealstage || "not set"}${l.error ? ` (${l.error})` : ""}`, $("leads"));
+  } catch (e) { $("error").textContent = e.message; }
+}
+$("sync").onclick = () => act("sync");
+load(); setInterval(load, 5000);
+</script>
+</html>
