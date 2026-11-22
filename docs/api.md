@@ -12,7 +12,7 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 |---|---|---|
 | `POST /api/runs` | `{product, target_country, client_name?, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
 | `GET /api/runs/:id/events` | | SSE, below |
-| `GET /api/runs/:id` | | `{run, running, steps, totals, plan, trace, shortlist: Lead[], max_selected, actions, report}` |
+| `GET /api/runs/:id` | | `{run, running, steps, totals, coverage, calls, trust (by lead_id: label, reason, record_dates, retrieved_at), plan, trace, shortlist: Lead[], max_selected, actions, report}` |
 | `POST /api/runs/:id/select` | `{lead_ids: string[]}`, 1 to 5 | resumes the run: contacts, emails, drafts |
 | `POST /api/actions/:id/approve`, `/reject` | | the action |
 | `POST /api/actions/:id/execute` | | once: writes to the test outbox, or emails a listed team inbox when `OUTREACH_TEST_RECIPIENTS` is set. `{ran, reason?}` |

@@ -105,7 +105,15 @@ const server = createServer(async (req, res) => {
       const shortlist = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
       const trace = ["plan", "customs", "research", "shortlist", "contacts", "write"].flatMap(s => ledger.stepOutput<any>(id, s)?.output?.trace ?? []);
       const plan = ledger.stepOutput<any>(id, "plan")?.output ?? null;
-      return json(res, 200, { shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
+      // one object for a screen: coverage, what each call cost, why each lead is trusted
+      const cu = ledger.stepOutput<any>(id, "customs")?.output;
+      const coverage = cu ? { customs: cu.coverage, rows_in_market: cu.rows_in_market, rows_matched: cu.rows_matched, researched: !!cu.needs_research } : null;
+      const calls = ledger.listCalls(id).map((c: any) => ({ step: c.step, endpoint: c.endpoint, status: c.status, credits: c.credits, model_cost_usd: c.model_cost_usd, latency_ms: c.latency_ms, at: c.retrieved_at }));
+      const trust = Object.fromEntries(shortlist.map((l: any) => [l.lead_id, {
+        label: l.match, reason: l.related_party ? `${l.match_reason}; related party, ranked last` : l.match_reason,
+        record_dates: l.behaviour ? { first: l.behaviour.first_month || null, last: l.behaviour.last_month || null } : null,
+        retrieved_at: l.claims[0]?.retrieved_at ?? null }]));
+      return json(res, 200, { coverage, calls, trust, shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
