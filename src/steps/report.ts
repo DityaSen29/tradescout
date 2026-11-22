@@ -20,7 +20,8 @@ export async function reportStep(ctx: StepCtx): Promise<Report & { monitor: Laye
   const layer = (name: string) => (ctx.outputs[name] as LayerResult | undefined) ?? null;
   const run = ctx.ledger.getRun(ctx.runId)!;
   const totals = ctx.ledger.totals(ctx.runId);
-  const unresolved = [...parse.questions, ...candidates.flatMap(c => c.unresolved.map(u => `${c.name}: ${u}`)), ...search.notes, ...vet.notes];
+  const policyUndated: string[] = ((ctx.outputs.policy as any)?.data?.undated ?? []).map((u: any) => `policy: undated mention "${u.title}" needs a person to check its date`);
+  const unresolved = [...parse.questions, ...policyUndated, ...candidates.flatMap(c => c.unresolved.map(u => `${c.name}: ${u}`)), ...search.notes, ...vet.notes];
   const limitations = [
     `Only the top ${vet.enriched_ids.length} by fit were enriched and vetted; the rest carry AMBER "not yet vetted".`,
     "Contacts come from an indexed people dataset refreshed every 1-30 days; a person may have moved.",
