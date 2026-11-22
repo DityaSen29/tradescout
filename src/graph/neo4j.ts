@@ -19,7 +19,7 @@ export class Neo4jGraph implements GraphSink {
     try {
       await session.executeWrite(async tx => {
         for (const n of this.nodes) {
-          await tx.run(`MERGE (x:${n.label} {id: $id}) SET x += $props, x.run_id = $run`, { id: n.id, props: clean(n.props), run: runId ?? null });
+          await tx.run(`MERGE (x:${n.label} {id: $id}) SET x += $props, x.run_id = $run, x.label = $label`, { id: n.id, props: clean(n.props), run: runId ?? null, label: n.label });
         }
         for (const e of this.edges) {
           await tx.run(`MATCH (a {id: $from}), (b {id: $to}) MERGE (a)-[r:${e.type}]->(b) SET r += $props`, { from: e.from, to: e.to, props: clean(e.props) });
