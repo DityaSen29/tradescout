@@ -35,7 +35,10 @@ export function installStub(opts: { failEnrich?: boolean } = {}) {
   const calls: Record<string, number> = {};
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async (url: any, init?: any) => {
-    const u = String(url); const path = u.replace("https://api.crustdata.com", "");
+    const u = String(url);
+    if (u.startsWith("https://comtradeapi.un.org")) return new Response(JSON.stringify({ data: [2022, 2023, 2024].flatMap(y => [{ period: y, partnerCode: 0, primaryValue: 1e8 * (y - 2020) }, { period: y, partnerCode: 699, primaryValue: 5e6 * (y - 2020) }]) }), { status: 200, headers: { "content-type": "application/json" } });
+    if (u.startsWith("https://wits.worldbank.org")) return new Response(`<Obs OBS_VALUE="${u.includes("/partner/IND/") ? "0" : "6.5"}"/>`, { status: 200 });
+    const path = u.replace("https://api.crustdata.com", "");
     calls[path] = (calls[path] ?? 0) + 1;
     const reply = (body: unknown, credits: number, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", "x-credits-used": String(credits), "x-ratelimit-remaining": "29" } });
     const req = init?.body ? JSON.parse(init.body) : {};
@@ -48,6 +51,7 @@ export function installStub(opts: { failEnrich?: boolean } = {}) {
     if (path === "/job/search") return reply(JOBS, 0.09);
     if (path === "/person/search") return reply(PEOPLE, 0.26);
     if (path === "/account/endpoints") return reply({ endpoints: [] }, 0);
+    if (path === "/web/search/live") return reply({ results: [{ title: "EU sets new labelling regulation for technical textiles", url: "https://example.com/news/eu-textile-labelling", published_date: "2026-10-05", snippet: "New regulation on labelling of imported textiles takes effect." }] }, 1);
     return reply({ error: `unstubbed ${path}` }, 0, 404);
   }) as any;
   return { calls, restore: () => { globalThis.fetch = realFetch; } };

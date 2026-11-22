@@ -6,6 +6,9 @@ import { intentStep } from "./steps/intent.js";
 import { contactsStep } from "./steps/contacts.js";
 import { draftStep } from "./steps/draft.js";
 import { reportStep } from "./steps/report.js";
+import { marketStep } from "./layers/market.js";
+import { tariffStep } from "./layers/tariff.js";
+import { policyStep } from "./layers/policy.js";
 
 /**
  * The TradeScout pipeline. Each step is a checkpoint in the ledger.
@@ -23,6 +26,9 @@ export function buildPipeline(): StepDef[] {
         return r;
       },
     },
+    { name: "market", run: marketStep, optional: true },
+    { name: "tariff", run: tariffStep, optional: true },
+    { name: "policy", run: policyStep, optional: true },
     { name: "search", run: searchStep },
     { name: "vet", run: vetStep },
     { name: "intent", run: intentStep, optional: true },

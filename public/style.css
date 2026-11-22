@@ -42,7 +42,7 @@ label input { margin-top: 4px; }
 .resolved { color: var(--ink-soft); margin-top: 4px; }
 .controls { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 
-.steps { list-style: none; margin: 18px 0 24px; padding: 0; display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; position: relative; }
+.steps { list-style: none; margin: 18px 0 24px; padding: 0; display: grid; grid-template-columns: repeat(10, 1fr); gap: 0; position: relative; }
 .steps::before { content: ""; position: absolute; left: 0; right: 0; top: 11px; height: 2px; background: var(--rule-strong); }
 .steps li { position: relative; padding-top: 30px; font-size: 13px; color: var(--ink-faint); }
 .steps li::before { content: ""; position: absolute; left: 0; top: 4px; width: 16px; height: 16px; border-radius: 50%; background: var(--paper); border: 2px solid var(--rule-strong); transition: background .3s, border-color .3s; }
@@ -57,7 +57,7 @@ label input { margin-top: 4px; }
 @media (prefers-reduced-motion: reduce) { .steps li.running::before { animation: none; } }
 
 .columns { display: grid; grid-template-columns: 1fr 320px; gap: 36px; }
-.layers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+.layers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
 .layer { border-top: 2px solid var(--ink); padding-top: 8px; font-size: 13px; }
 .layer h3 { font-size: 15px; }
 .layer .state { color: var(--ink-faint); }

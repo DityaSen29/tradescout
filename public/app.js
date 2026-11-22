@@ -1,6 +1,6 @@
 /* TradeScout desk: a thin client over the API. No build step. */
 const $ = (s, el = document) => el.querySelector(s);
-const STEPS = [["parse", "Read the request"], ["search", "Find counterparties"], ["vet", "Vet them"], ["intent", "Buying signals"], ["contacts", "Find the buyer"], ["draft", "Draft the note"], ["report", "Write the report"]];
+const STEPS = [["parse", "Read the request"], ["market", "Market"], ["tariff", "Duty"], ["policy", "Policy"], ["search", "Find counterparties"], ["vet", "Vet them"], ["intent", "Buying signals"], ["contacts", "Find the buyer"], ["draft", "Draft the note"], ["report", "Write the report"]];
 let current = null, es = null, pollTimer = null;
 
 const fmtCredits = (n) => (Math.round((n ?? 0) * 100) / 100).toString();
@@ -64,7 +64,8 @@ function renderReport(d) {
   // layers
   $("#layers").innerHTML = [
     layerBox("Market", r?.market, (l) => `<p>${esc(l.data?.summary ?? "")}</p>`),
-    layerBox("Duty and policy", r?.tariff ?? r?.policy, (l) => `<p>${esc(l.data?.summary ?? "")}</p>`),
+    layerBox("Duty", r?.tariff, (l) => `<p>${esc(l.data?.summary ?? "")}</p>`),
+    layerBox("Policy", r?.policy, (l) => `<p>${esc(l.data?.summary ?? "")}</p>${(l.data?.items || []).map(i => `<p><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a> <span class="state">${esc(i.date ? String(i.date).slice(0, 10) : "")}</span></p>`).join("")}`),
     layerBox("Since last run", r?.monitor, (l) => l.data.changes.length ? `<ul>${l.data.changes.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : `<p>No change since ${when(l.data.since)}.</p>`),
   ].join("");
 

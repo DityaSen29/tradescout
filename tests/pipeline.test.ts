@@ -36,7 +36,8 @@ describe("end-to-end on stubbed Crustdata", () => {
     expect(drafts.length).toBeGreaterThanOrEqual(1);
     expect(drafts.every((a: any) => a.status === "proposed")).toBe(true);
     expect(r.ledger.credits_used).toBeGreaterThan(0);
-    expect(r.ledger.calls).toBe(4);
+    expect(r.ledger.calls).toBe(8);   // comtrade, wits x2, web search, company search, enrich, jobs, people
+    expect(r.market.status).toBe("ok"); expect(r.tariff.data.preference).toBe(true); expect(r.policy.data.flag).toBe("AMBER");
     expect(r.monitor.status).toBe("unavailable");
   });
 
