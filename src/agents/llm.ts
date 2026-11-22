@@ -29,7 +29,7 @@ async function generate(model: string, system: string, prompt: string, maxOut: n
   if (!key) throw new LlmError(401, "GEMINI_API_KEY is not set: the agents cannot run");
   for (let attempt = 0; ; attempt++) {
     const res = await fetchOnce(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, () => ({
-      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(45_000),
+      method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(50_000),
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: maxOut } }),
     }));
@@ -53,9 +53,16 @@ export async function askJson<S extends z.ZodType>(ctx: StepCtx, o: { agent: str
     const prompt = `<DATA>\n${JSON.stringify(o.data).replace(/</g, "\\u003c")}\n</DATA>${problem ? `\n\nYour last reply was rejected: ${problem}. Return corrected JSON.` : ""}`;
     const p = priceOf(model);
     const maxUnits = ((system.length + prompt.length) / 2.5) * p.in + maxOut * p.out;
-    const r = await ctx.call<{ text: string; usd: number | null }>(
-      { source: "llm", endpoint: `${model}:${o.agent}`, request: { model, system, prompt }, maxUnits, model_cost_usd: (x) => x.usd ?? maxUnits },
-      () => generate(model, system, prompt, maxOut));
+    let r: { data: { text: string; usd: number | null } };
+    try {
+      r = await ctx.call<{ text: string; usd: number | null }>(
+        { source: "llm", endpoint: `${model}:${o.agent}`, request: { model, system, prompt }, maxUnits, model_cost_usd: (x) => x.usd ?? maxUnits },
+        () => generate(model, system, prompt, maxOut));
+    } catch (err: any) {
+      // a model call changes nothing outside, so one more try is safe. The first hold stays counted against the cap.
+      if (attempt === 0 && err?.name === "TimeoutError") { ctx.log(`agent:orchestrator: the ${o.agent} timed out, trying once more`); continue; }
+      throw err;
+    }
     try {
       const parsed = o.schema.safeParse(JSON.parse(r.data.text.replace(/^```(json)?|```$/gm, "").trim()));
       if (parsed.success) return parsed.data;
