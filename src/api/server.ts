@@ -24,6 +24,7 @@ import { executeApproved } from "../actions/execute.js";
  *   GET  /                         static frontend from ./public
  */
 const PORT = Number(process.env.PORT ?? 8787);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"].map(h => `${h}:${PORT}`));
 const ledger = new Ledger();
 const running = new Set<string>();
 
@@ -39,7 +40,7 @@ function start(runId: string, mode: "run" | "resume") {
     .finally(() => running.delete(runId));
 }
 
-const json = (res: ServerResponse, code: number, body: unknown) => { res.writeHead(code, { "content-type": "application/json", "access-control-allow-origin": "*" }); res.end(JSON.stringify(body)); };
+const json = (res: ServerResponse, code: number, body: unknown) => { res.writeHead(code, { "content-type": "application/json" }); res.end(JSON.stringify(body)); };
 const readBody = (req: IncomingMessage) => new Promise<any>((resolve, reject) => { let s = ""; req.on("data", c => s += c); req.on("end", () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } }); });
 const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
 /** Depth-first search of a stored response for the record whose id fields match. */
@@ -57,7 +58,10 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const p = url.pathname; const m = req.method ?? "GET";
   try {
-    if (m === "OPTIONS") { res.writeHead(204, { "access-control-allow-origin": "*", "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type" }); return res.end(); }
+    // approvals and paid runs are local only: no other site, and no rebound hostname, may drive them
+    const origin = req.headers.origin;
+    if (!LOCAL_HOSTS.has(req.headers.host ?? "") || (origin && origin !== `http://${req.headers.host}`)) return json(res, 403, { error: "local requests only" });
+    if (p === "/api/limits" && m === "GET") return json(res, 200, ledger.spendToday());
     if (p === "/api/health") return json(res, 200, { ok: true, running: [...running], time: new Date().toISOString() });
     if (p === "/api/runs" && m === "POST") {
       const body = RequestSchema.parse(await readBody(req));
@@ -74,7 +78,7 @@ const server = createServer(async (req, res) => {
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
-      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive", "access-control-allow-origin": "*" });
+      res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive" });
       let closed = false; let unsub: () => void = () => {};
       const listener = (e: any) => {
         if (closed) return;
@@ -122,4 +126,4 @@ const server = createServer(async (req, res) => {
 });
 process.on("uncaughtException", (e) => console.error("uncaught:", e));
 process.on("unhandledRejection", (e) => console.error("unhandled:", e));
-server.listen(PORT, () => console.log(`TradeScout API on http://localhost:${PORT}`));
+server.listen(PORT, "127.0.0.1", () => console.log(`TradeScout API on http://localhost:${PORT}`));

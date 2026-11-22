@@ -70,7 +70,7 @@ export interface ProposedAction {
   run_id: string;
   kind: "email_draft" | "rfq_draft" | "shortlist_file";
   idempotency_key: string;
-  status: "proposed" | "approved" | "rejected" | "executing" | "executed";
+  status: "proposed" | "approved" | "rejected" | "executing" | "executed" | "unknown";
   payload: Record<string, unknown>;
   created_at: string;
   executed_at: string | null;

@@ -20,7 +20,7 @@ export const ENRICH = {
     { title: "Rhein Vliesstoffe announces layoffs at Krefeld plant", url: "https://example.com/news/rhein-layoffs", date: "2026-09-14" },
   ] : [] })),
 };
-export const JOBS = { jobs: [
+export const JOBS = { job_listings: [
   { job_id: 9001, job_details: { title: "Senior Purchasing Manager Technical Textiles" }, company: { basic_info: { company_id: 101 } }, metadata: { date_added: "2026-11-01" } },
   { job_id: 9002, job_details: { title: "Sales Engineer" }, company: { basic_info: { company_id: 101 } }, metadata: { date_added: "2026-11-03" } },
   { job_id: 9003, job_details: { title: "Backend Engineer" }, company: { basic_info: { company_id: 104 } }, metadata: { date_added: "2026-10-20" } },

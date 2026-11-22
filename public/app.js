@@ -125,8 +125,9 @@ function renderReport(d) {
     const btns = $(".btns", div);
     if (a.status === "proposed") btns.innerHTML = `<button data-v="approve">Approve</button><button data-v="reject" class="ghost">Reject</button>`;
     if (a.status === "approved") btns.innerHTML = `<button data-v="execute">Write the .eml file</button>`;
+    if (a.status === "unknown") btns.innerHTML = `<span class="state">Outcome unknown, so it will not retry. Check, then reconcile from the CLI.</span>`;
     if (a.status === "executed") btns.innerHTML = `<span class="state">Written once to data/out. Sending stays with you.</span>`;
-    btns.onclick = async (e) => { const v = e.target.dataset.v; if (!v) return; e.target.disabled = true; try { await api(`/actions/${a.id}/${v}`, { method: "POST" }); } catch (err) { alert(err.message); } openRun(current); };
+    btns.onclick = async (e) => { const v = e.target.dataset.v; if (!v) return; e.target.disabled = true; try { const res = await api(`/actions/${a.id}/${v}`, { method: "POST" }); if (v === "execute" && res.ran === false) alert("Not written: this buyer already has an executed or unresolved action for this product and market, or this action is no longer approved."); } catch (err) { alert(err.message); } openRun(current); };
     ab.appendChild(div);
   }
 

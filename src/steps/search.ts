@@ -1,4 +1,5 @@
 import type { StepCtx } from "../runner/pipeline.js";
+import { MAX_CREDITS } from "../core/limits.js";
 import type { Candidate } from "../core/types.js";
 import { and, f, flattenCompany } from "../sources/crustdata.js";
 import { crust, apiEvidence, iso3Of, SEARCH_FIELDS } from "./common.js";
@@ -16,6 +17,7 @@ export async function searchStep(ctx: StepCtx): Promise<SearchOutput> {
   const notes: string[] = [];
   const run = async (min: number, max: number) => ctx.call({
     source: "crustdata", endpoint: "/company/search", request: { country: plan.country_iso3, min, max, query: plan.query, fields: SEARCH_FIELDS, limit: 25 },
+    maxUnits: MAX_CREDITS.companySearch(25),
     credits: (r: any) => r.credits,
   }, async () => {
     const r = await crust().companySearch({ filters: and(f("locations.country", "=", plan.country_iso3), f("headcount.total", "=>", min), f("headcount.total", "=<", max)), fields: SEARCH_FIELDS, limit: 25, query: plan.query, mode: "hybrid" });

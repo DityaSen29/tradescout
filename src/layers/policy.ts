@@ -1,4 +1,5 @@
 import type { StepCtx } from "../runner/pipeline.js";
+import { MAX_CREDITS } from "../core/limits.js";
 import type { LayerResult } from "../core/types.js";
 import { crust } from "../steps/common.js";
 
@@ -14,7 +15,7 @@ export async function policyStep(ctx: StepCtx): Promise<LayerResult<PolicyData>>
   const country = parse.country?.name; const hsText: string = (parse.hs.best?.text ?? ctx.request.product).split(";")[0].slice(0, 60);
   if (!country) return { layer: "policy", status: "unavailable", reason: "no target country", evidence: [], credits: 0, latency_ms: 0 };
   const query = `${country} import tariff ${ctx.request.product} India ${new Date().getFullYear()}`;
-  const r = await ctx.call({ source: "crustdata", endpoint: "/web/search/live", request: { query, sources: ["news"] }, credits: (x: any) => x.credits }, async () => {
+  const r = await ctx.call({ source: "crustdata", endpoint: "/web/search/live", request: { query, sources: ["news"] }, maxUnits: MAX_CREDITS.webSearch(1), credits: (x: any) => x.credits }, async () => {
     const x = await crust().webSearch({ query, sources: ["news"], page: 1 });
     const results: any[] = x.data.results ?? x.data.data ?? x.data.items ?? [];
     return { results, credits: x.credits, retrieved_at: x.retrieved_at };

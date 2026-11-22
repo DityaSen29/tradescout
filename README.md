@@ -63,6 +63,20 @@ TRADESCOUT_KILL_DURING=contacts npm run run -- --product "basmati rice" --countr
 
 Per-run ceilings: `RUN_TIME_LIMIT_MS` (default 240 s of active time per attempt) and `RUN_CREDIT_LIMIT` (default 60 credits).
 
+## Hard API limits
+
+| Provider | Per run | Per day (IST) | Variables |
+|---|---|---|---|
+| Crustdata | 60 credits | 1,000 credits | `RUN_CREDIT_LIMIT`, `CRUSTDATA_DAILY_LIMIT` |
+| Apollo | 25 credits | 100 credits | `APOLLO_RUN_LIMIT`, `APOLLO_DAILY_LIMIT` |
+| LLM | $0.50 | $3 | `LLM_RUN_LIMIT_USD`, `LLM_DAILY_LIMIT_USD` |
+
+- Each paid call holds its worst-case cost before it starts and settles to the reported charge afterwards. A call that would cross either limit is never made.
+- A timeout, 5xx, malformed 200 or crash keeps its hold, because the charge is unknown. A paid call with no stated maximum, or an unclassified source, is refused.
+- The limits cover calls this app makes through `ctx.call`, counted in its own ledger. Apollo and LLM have no caller yet. Use of the Apollo connector or the same keys elsewhere is not counted.
+- `npx tsx src/cli.ts limits` shows today's use.
+- An action with an unknown outcome is never retried. Check it, then run `npx tsx src/cli.ts reconcile <action-id> done|not-done`.
+
 ## How it's built
 
 Diagram: [docs/architecture.md](docs/architecture.md). Test cases: [docs/test-cases.md](docs/test-cases.md).

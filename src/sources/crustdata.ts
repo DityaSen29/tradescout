@@ -6,7 +6,7 @@
 export const CRUSTDATA_BASE = "https://api.crustdata.com";
 export const CRUSTDATA_VERSION = "2025-11-01";
 
-export interface CrustResponse<T = any> { data: T; credits: number; ratelimit_remaining: number | null; retrieved_at: string; status: number }
+export interface CrustResponse<T = any> { data: T; credits: number | null; ratelimit_remaining: number | null; retrieved_at: string; status: number }
 export class CrustdataError extends Error { constructor(public status: number, msg: string) { super(msg); this.name = "CrustdataError"; } }
 
 export type Filter = { field: string; type: string; value: unknown } | { op: "and" | "or"; conditions: Filter[] };
@@ -39,7 +39,7 @@ export class Crustdata {
       const text = await res.text();
       if (res.status >= 400) throw new CrustdataError(res.status, `${res.status} ${path}: ${text.slice(0, 300)}`);
       const data = text ? JSON.parse(text) : {};
-      return { data, credits: Number(res.headers.get("x-credits-used") ?? 0), ratelimit_remaining: res.headers.get("x-ratelimit-remaining") ? Number(res.headers.get("x-ratelimit-remaining")) : null, retrieved_at: new Date().toISOString(), status: res.status };
+      return { data, credits: res.headers.get("x-credits-used") ? Number(res.headers.get("x-credits-used")) : null, ratelimit_remaining: res.headers.get("x-ratelimit-remaining") ? Number(res.headers.get("x-ratelimit-remaining")) : null, retrieved_at: new Date().toISOString(), status: res.status };
     }
     throw new CrustdataError(429, `rate limited after ${this.maxTries} tries on ${path}`);
   }
@@ -50,13 +50,13 @@ export class Crustdata {
     if (p.filters) body.filters = p.filters;
     if (p.query) body.search = { query: p.query, mode: p.mode ?? "hybrid" };
     if (p.cursor) body.cursor = p.cursor;
-    return this.request("POST", "/company/search", body);
+    return this.records("/company/search", body, ["companies"]);
   }
   companyEnrich(p: { domains?: string[]; ids?: number[]; fields?: string[]; exact_match?: boolean }) {
     const body: any = { fields: p.fields ?? ["basic_info", "headcount", "funding", "news"], exact_match: p.exact_match ?? true };
     if (p.domains) body.domains = p.domains.slice(0, 25);
     if (p.ids) body.crustdata_company_ids = p.ids.slice(0, 25);
-    return this.request("POST", "/company/enrich", body);
+    return this.records("/company/enrich", body, ["companies", "items"], true);
   }
   companyIdentify(p: { name?: string; domain?: string; domains?: string[] }) {
     const body: any = {};
@@ -68,16 +68,23 @@ export class Crustdata {
   personSearch(p: { filters: Filter; fields: string[]; limit?: number; query?: string }) {
     const body: any = { filters: p.filters, fields: p.fields, limit: p.limit ?? 10 };
     if (p.query) body.search = { query: p.query };
-    return this.request("POST", "/person/search", body);
+    return this.records("/person/search", body, ["profiles"]);
   }
   jobSearch(p: { filters: Filter; fields?: string[]; limit?: number; aggregations?: unknown }) {
     const body: any = { filters: p.filters, limit: p.limit ?? 0 };
     if (p.fields) body.fields = p.fields;
     if (p.aggregations) body.aggregations = p.aggregations;
-    return this.request("POST", "/job/search", body);
+    return this.records("/job/search", body, ["jobs", "job_listings", "results", "items"]);
   }
   webSearch(p: { query: string; sources?: string[]; page?: number }) {
-    return this.request("POST", "/web/search/live", { query: p.query, sources: p.sources ?? ["news", "web"], page: p.page ?? 1 });
+    return this.records("/web/search/live", { query: p.query, sources: p.sources ?? ["news", "web"], page: p.page ?? 1 }, ["results", "data", "items"]);
+  }
+  /** A 200 without the record list is a failure. It must never read as "no results". */
+  private async records(path: string, body: unknown, keys: string[], bareArray = false) {
+    const r = await this.request("POST", path, body);
+    if (!(bareArray && Array.isArray(r.data)) && !keys.some(k => Array.isArray(r.data?.[k])))
+      throw new CrustdataError(502, `${path} returned 200 without a ${keys[0]} list`);
+    return r;
   }
 }
 

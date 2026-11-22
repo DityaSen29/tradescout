@@ -1,6 +1,7 @@
 import type { StepCtx } from "../runner/pipeline.js";
 import type { ProposedAction } from "../core/types.js";
 import type { VetOutput } from "./vet.js";
+import { hashOf } from "../ledger/ledger.js";
 
 /** Step: draft the first email per contacted candidate as a proposed action. Nothing is sent; a person approves or rejects. Deterministic template, no model memory. */
 export async function draftStep(ctx: StepCtx): Promise<{ actions: ProposedAction[] }> {
@@ -13,6 +14,7 @@ export async function draftStep(ctx: StepCtx): Promise<{ actions: ProposedAction
     const whyLine = why ? `${c.name} stood out because it ${why.replace("describes itself with", "works with").replace("industry:", "operates in")}.` : `${c.name} stood out as an established ${parse.country?.name ?? c.country} company in this category${c.headcount ? ` (about ${c.headcount} staff)` : ""}.`;
     const body = `Dear ${c.contact!.name},\n\nI run exports of ${ctx.request.product} (HS ${parse.hs.best?.code ?? ""}) from India and am looking for a distribution partner in ${parse.country?.name ?? c.country}. ${whyLine}${signal}\n\nWould you be open to a 20-minute call next week to see whether our range fits your portfolio? I can share specifications, certifications and indicative FOB pricing beforehand.\n\nBest regards,\n[Your name]\n[Company]`;
     const a = ctx.ledger.proposeAction(ctx.runId, "email_draft", `draft:${ctx.runId}:${c.company_id}`, {
+      dedupe_key: hashOf([c.company_id, c.contact!.name.trim().toLowerCase(), ctx.request.product.trim().toLowerCase(), parse.country?.iso3 ?? c.country]),
       to_name: c.contact!.name, to_title: c.contact!.title, company: c.name, company_id: c.company_id, subject: `Distribution partnership for ${ctx.request.product} in ${parse.country?.name ?? c.country}`, body,
       based_on: c.evidence.slice(0, 3).map(e => e.source_url),
     });
