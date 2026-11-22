@@ -22,7 +22,7 @@ Every capability in this document carries one of these labels. Status is as of 5
 | **Being built** | In progress or on another branch. It is not part of this branch's product yet. |
 | **Roadmap** or **Coming soon** | Not available in the product yet. |
 
-In short: **the agents, Crustdata, the customs-file route, the ledger and the caps are live. CRM sync and outreach are built and tested on simulators, with no real send claimed. The redesigned interface is being built. Other CRMs are coming soon. Buyer intelligence is Feature 2.**
+In short: **the agents, Crustdata, the customs-file route, the ledger and the caps are live. CRM sync and outreach are built and tested on simulators, with no real send claimed. The redesigned interface is merged, and some of its screens still show example data. Other CRMs are coming soon. Buyer intelligence is Feature 2.**
 
 ---
 
@@ -143,7 +143,8 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | Only HubSpot is offered. Zoho adapter code exists but has only met a simulator. |
 | Gmail outreach, follow-ups, reply triage and alerts | **Built, simulated** | Wired into this branch and tested on a simulated mailbox. It can email only listed team test inboxes. No real send is claimed. |
 | Exclude the exporter's existing buyers, rank related parties last | **Built, tested offline** | Needs the exporter's company name in the brief |
-| Redesigned "Agent rail" interface | **Being built** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
+| Redesigned "Agent rail" interface | **Built, partly on example data** | Merged at 5:57 PM as `public/desk.html`, served at `/desk.html`. Not yet verified end to end here. |
+| Public Vercel prototype | **Simulated** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
 | Buyer intelligence | **Roadmap: Feature 2** | Shown as coming next |
 | Automated named-company route | **Roadmap** | Sold manually today |
 | Sanctions screening in the buyer pipeline | **Roadmap** | Code from the earlier product is in the repository but is not wired into this flow |
@@ -263,7 +264,7 @@ The tests use stubs for paid services. The live runs above are separate evidence
 | Importer match rate | One to two of five | Measured on a labelled set, with no wrong matches |
 | Outreach from the client's Gmail | Wired and simulated. A team mailbox has signed in. No send is claimed. | One approved email reaches a team test inbox once and its reply is classified |
 | HubSpot against a real account | Simulated. Waiting on a service key. | A double push creates no duplicate and a stage change comes back |
-| Agent rail interface | First draft of the screens | Connected to this API and tested at projector size |
+| Agent rail interface | Merged, with some screens on example data | Connected to this API and tested at projector size |
 
 **Outreach, as built and simulated:** Gmail sign-in, SPF, DKIM and DMARC checks, a daily ramp of 10, 20, 30 and then 40 emails, a reply and bounce check before every send, follow-ups on days 3, 7 and 14, reply classification, and escalation. It has an approval mode and a bounded auto mode for follow-ups. Bookings and answers always go to a person, and it can email only an explicit list of team test inboxes today.
 
