@@ -10,7 +10,7 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 
 | Call | Body | Returns |
 |---|---|---|
-| `POST /api/runs` | `{product, target_country, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
+| `POST /api/runs` | `{product, target_country, client_name?, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
 | `GET /api/runs/:id/events` | | SSE, below |
 | `GET /api/runs/:id` | | `{run, running, steps, totals, plan, trace, shortlist: Lead[], max_selected, actions, report}` |
 | `POST /api/runs/:id/select` | `{lead_ids: string[]}`, 1 to 5 | resumes the run: contacts, emails, drafts |

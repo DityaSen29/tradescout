@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Ledger } from "../src/ledger/ledger.js";
 import { runPipeline } from "../src/runner/pipeline.js";
 import { checkDraft, draftHash } from "../src/buyer/write.js";
-import { behaviourOf, isBlank, isBuyerName, redactDescription, runQueries, type Row } from "../src/buyer/customs.js";
+import { behaviourOf, isBlank, isClient, isRelatedParty, isBuyerName, redactDescription, runQueries, type Row } from "../src/buyer/customs.js";
 import { quoteInSource, sourceAboutCompany } from "../src/buyer/common.js";
 import { nameMatch, searchName } from "../src/buyer/contacts.js";
 import { onDoNotContact, selectStep } from "../src/buyer/select.js";
@@ -48,6 +48,15 @@ describe("customs route", () => {
   it("redacts parties, contacts and references before a model reads a description", () => {
     const d = redactDescription(row({ importer: "Example Importer", description: "NATURAL MENTHOL CRYSTALS 25 KG PO 4500123456 EXAMPLE IMPORTER a.b@example.com" }));
     expect(d).toBe("NATURAL MENTHOL CRYSTALS 25 KG PO");
+  });
+  it("recognises the client's own buyers", () => {
+    expect(isClient("A.B. MINT PRODUCTS PVT LTD", "A B Mint Products")).toBe(true);
+    expect(isClient("OTHER MINT PRODUCTS", "A B Mint Products")).toBe(false);
+  });
+  it("recognises an importer buying from its own parent", () => {
+    expect(isRelatedParty("EXAMPLON LLC", "EXAMPLON PVT LTD")).toBe(true);
+    expect(isRelatedParty("ZED AROMATICS LLC", "ZED AROMATICS LTD")).toBe(true);
+    expect(isRelatedParty("NATURAL FOODS INC", "NATURAL MENTHOL WORKS")).toBe(false);
   });
   it("runs a typed query", () => {
     const q = [{ hs_prefix: "730890", destination_iso3: "USA", include_terms: [], exclude_terms: [], group_by: "importer" as const, measures: [] }];

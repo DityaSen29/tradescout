@@ -29,6 +29,7 @@ button.quiet{background:transparent;color:var(--accent)}button:disabled{opacity:
   <div>
     <section><h2>Brief</h2>
       <form id="brief">
+        <label>Your company, so your own customers are excluded<input name="client_name" minlength="4" maxlength="120"></label>
         <label>Exact product<input name="product" required></label>
         <label>HSN, if known<input name="hs_code" pattern="\d{4,8}"></label>
         <label>Market<input name="target_country" required></label>

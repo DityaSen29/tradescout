@@ -17,7 +17,7 @@ function leadRow(l, waiting) {
   const b = l.behaviour;
   const facts = b ? [`${b.records} records`, `${b.first_month} to ${b.last_month}`, b.total_value_usd && `$${b.total_value_usd.toLocaleString()}`, b.net_weight_kg && `${b.net_weight_kg.toLocaleString()} kg`, b.median_usd_per_kg && `median $${b.median_usd_per_kg}/kg`].filter(Boolean).join(" · ") : "";
   const proof = l.claims.map((c) => { const u = safeUrl(c.source_url); return `<li>${esc(c.text)}<br><q>${esc(c.quote)}</q> ${u ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">source</a>` : `<span class="muted">${esc(c.record_id)}</span>`}</li>`; }).join("");
-  return `<div class="row"><label>${waiting ? `<input type="checkbox" value="${esc(l.lead_id)}"> ` : ""}<strong>${esc(l.company.name)}</strong> ${esc(LABEL[l.match])} · fit ${esc(l.fit_score)}</label>
+  return `<div class="row"><label>${waiting ? `<input type="checkbox" value="${esc(l.lead_id)}"> ` : ""}<strong>${esc(l.company.name)}</strong> ${esc(LABEL[l.match])}${l.related_party ? " · related party, ranked last" : ""} · fit ${esc(l.fit_score)}</label>
     <div class="muted">${esc(facts || l.match_reason)}</div>
     ${l.contact ? `<div>${esc(l.contact.name)}, ${esc(l.contact.title)} · ${esc(l.contact.email ?? "no work email")} (${esc(l.contact.email_status)})</div>` : ""}
     ${l.needs_person.length ? `<div class="muted">Needs a person: ${esc(l.needs_person.join("; "))}</div>` : ""}
@@ -70,6 +70,7 @@ $("#brief").onsubmit = (e) => { e.preventDefault(); guarded(async () => {
   const f = Object.fromEntries(new FormData(e.target));
   const body = { product: f.product, target_country: f.target_country };
   if (f.hs_code) body.hs_code = f.hs_code.trim();
+  if (f.client_name) body.client_name = f.client_name.trim();
   if (f.notes) body.notes = f.notes.trim();
   if (f.do_not_contact) body.do_not_contact = f.do_not_contact.split("\n").map((s) => s.trim()).filter(Boolean);
   const { run_id } = await api("/runs", body);

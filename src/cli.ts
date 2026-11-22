@@ -17,7 +17,7 @@ async function main() {
     const request = RequestSchema.parse({
       product: flags.product, target_country: flags.country,
       min_headcount: flags.min ? Number(flags.min) : undefined, max_headcount: flags.max ? Number(flags.max) : undefined,
-      fob_price_usd: flags.fob ? Number(flags.fob) : undefined, hs_code: flags.hs, notes: flags.notes, do_not_contact: flags.exclude ? flags.exclude.split(",") : undefined,
+      fob_price_usd: flags.fob ? Number(flags.fob) : undefined, hs_code: flags.hs, notes: flags.notes, client_name: flags.client, do_not_contact: flags.exclude ? flags.exclude.split(",") : undefined,
     });
     const runId = ledger.createRun(request);
     log(`run ${runId}`);

@@ -65,6 +65,22 @@ export function behaviourOf(rows: Row[]): BuyingBehaviour {
   };
 }
 
+const flatName = (s: string) => s.toLowerCase().replace(/&/g, "and").replace(/\b(pvt|private|ltd|limited|inc|llc|co|company|corp|corporation|exports?)\b/g, "").replace(/[^a-z0-9]/g, "");
+/** Is this supplier the client itself? Spacing and dots vary between manifests: "A B MINT", "A.B. Mint". */
+export function isClient(supplier: string | null, client: string | undefined): boolean {
+  if (!supplier || !client) return false;
+  const s = flatName(supplier), c = flatName(client);
+  return c.length >= 5 && s.length >= 5 && (s.startsWith(c) || c.startsWith(s));
+}
+const SHARED_WORDS = new Set("american national international global united universal general natural pacific premier royal north south east west eastern western central golden star shanghai china india indian menthol mint aroma aromatics aromatic chemical chemicals pharma steel trading industries the".split(" "));
+/** A US arm buying from its Indian parent is not an open buyer. Judged on the distinctive start of both names. */
+export function isRelatedParty(importer: string, supplier: string | null): boolean {
+  if (!supplier) return false;
+  const a = cleanName(importer).split(" "), b = cleanName(supplier).split(" ");
+  if (!a[0] || a[0] !== b[0]) return false;
+  return (a[0].length >= 4 && !SHARED_WORDS.has(a[0])) || (!!a[1] && a[1] === b[1]);
+}
+
 export interface CustomsOutput {
   coverage: "records" | "none"; rows_in_market: number; rows_matched: number; leads: Lead[]; needs_research: boolean; trace: Trace[];
 }
@@ -120,7 +136,11 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     groups.set(key, [...(groups.get(key) ?? []), h]);
   }
   const leads: Lead[] = [];
+  const client = ctx.request.client_name;
+  if (!client) say("policy", "No client company name in the brief, so importers the client already supplies cannot be excluded.");
+  let own = 0, related = 0;
   for (const rows of groups.values()) {
+    if (rows.some(x => isClient(x.supplier, client)) || isClient(rows[0].importer, client)) { own++; continue; }
     const matched = rows.filter(x => !isBlank(x.description) && exact.has(redactDescription(x)));
     const used = matched.length ? matched : rows;
     const b = behaviourOf(used);
@@ -130,6 +150,12 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
       match: matched.length ? "import_record" : "category_match", score,
       reason: matched.length ? `${matched.length} import record(s) whose description is this product` : "imports under the HS code; the description is blank or a different product" });
     lead.behaviour = b;
+    const kin = used.filter(x => isRelatedParty(x.importer, x.supplier));
+    if (kin.length) {
+      const share = kin.length / used.length;
+      lead.needs_person.push(`possible related party: ${Math.round(share * 100)}% of these records come from ${kin[0].supplier}, which shares its name`);
+      if (share >= 0.5) { lead.related_party = kin[0].supplier!; lead.fit_score = Math.max(5, lead.fit_score - 45); related++; }
+    }
     const first = used[0];
     const text = matched.length ? `Imported this product: ${used.length} record(s), ${b.first_month} to ${b.last_month}` : `Imported under HS ${lead.hs_codes.join(", ")}: ${used.length} record(s). The product is not confirmed`;
     lead.claims.push({ id: hashOf([lead.lead_id, "customs"]).slice(0, 10), lead_id: lead.lead_id, text, kind: "customs",
@@ -138,8 +164,10 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     if (!matched.length) lead.needs_person.push("product not identified in the record: request the detailed product report");
     leads.push(lead);
   }
-  leads.sort((a, b) => b.fit_score - a.fit_score);
-  const exactLeads = leads.filter(l => l.match === "import_record").length;
+  if (own) say("policy", `${own} importer(s) removed: the client already supplies them`);
+  if (related) say("policy", `${related} importer(s) buy mostly from their own parent or sister company: flagged and ranked last`);
+  leads.sort((a, b) => Number(!!a.related_party) - Number(!!b.related_party) || b.fit_score - a.fit_score);
+  const exactLeads = leads.filter(l => l.match === "import_record" && !l.related_party).length;
   say("customs", `${leads.length} importers: ${exactLeads} with this exact product, the rest category only`);
   return { coverage: "records", rows_in_market: inMarket, rows_matched: hits.length, leads: leads.slice(0, 25), needs_research: exactLeads < 3, trace };
 }
