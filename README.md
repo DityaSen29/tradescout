@@ -325,7 +325,7 @@ flowchart TB
     API["Local API<br/>and event stream"]:::live
     ORCH["Orchestrator<br/>8 checkpointed steps"]:::live
     AG["Agents propose<br/>code checks"]:::live
-    GATE{"Spend gate<br/>ctx.call"}:::live
+    GATE["Spend gate<br/>ctx.call"]:::live
     DB[("SQLite ledger<br/>steps · calls · actions")]:::live
   end
   subgraph DATA["Data and models"]
@@ -356,44 +356,35 @@ Green is live, blue is tested offline, purple is simulated, and orange is a pers
 
 ### Agent orchestration
 
-Purple is an agent, always paired with checks in code. Green is plain code. Orange is a decision only a person makes. Dotted arrows are the bounded retries.
+Purple is an agent, always paired with checks in code. Green is plain code. Orange is a decision only a person makes. Each critic can send work back once.
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":24,"rankSpacing":30,"curve":"basis"}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","clusterBkg":"#f8fafc","clusterBorder":"#94a3b8","edgeLabelBackground":"#ffffff"},"flowchart":{"nodeSpacing":34,"rankSpacing":24,"curve":"basis","wrappingWidth":260}}}%%
 flowchart TB
   IN["Product · HSN · country"]:::human
   subgraph FIND["1 · Find and prove"]
-    PL["Planner<br/>expands HS codes"]:::agent
-    CQ["Customs query"]:::code
-    MA["Matcher<br/>exact product?"]:::agent
-    RE["Researcher<br/>Crustdata tools"]:::agent
-    EC{"Quote check,<br/>then critic"}:::agent
+    PL(["Planner: expands HS codes"]):::agent
+    MA(["Customs query + matcher"]):::agent
+    RE(["Researcher + evidence critic"]):::agent
     SL["Ranked shortlist"]:::code
   end
-  PICK{{"Person selects 1 to 5"}}:::human
+  PICK["Person selects 1 to 5"]:::human
   subgraph REACH["2 · Reach the right person"]
-    IC{"Identity critic"}:::agent
-    EN["Person and<br/>work email"]:::code
-    CW["Copywriter"]:::agent
-    DC{"Fact check,<br/>then critic"}:::agent
+    IC(["Identity critic"]):::agent
+    EN["Person + work email"]:::code
+    CW(["Copywriter + draft critic"]):::agent
   end
   NP["Needs a person"]:::stop
-  OK{{"Person approves"}}:::human
-  OB["One file in<br/>test outbox"]:::code
-  IN --> PL --> CQ
-  CQ -->|records| MA
-  CQ -->|none| RE
-  MA -->|under 3 proven| RE
-  RE --> EC
-  EC -.->|retry once| RE
-  EC --> SL
-  MA --> SL
+  OK["Person approves"]:::human
+  OB["Test outbox"]:::code
+  IN --> PL --> MA
+  MA -->|proven| SL
+  MA -->|too few or none| RE --> SL
   SL --> PICK --> IC
-  IC -->|confirmed| EN --> CW --> DC
+  IC -->|sure| EN --> CW
   IC -->|unsure| NP
-  DC -.->|rewrite once| CW
-  DC -->|fails twice| NP
-  DC -->|passes| OK --> OB
+  CW -->|fails twice| NP
+  CW -->|passes| OK --> OB
   classDef agent fill:#eee3fa,stroke:#7c4bc0,stroke-width:2px,color:#2a1446
   classDef code fill:#d4efe1,stroke:#1e8a5a,stroke-width:2px,color:#0b2a1c
   classDef human fill:#fde0d5,stroke:#d0542a,stroke-width:3px,color:#3d1405
@@ -423,6 +414,12 @@ A lead can always stop for a person, and an unclear outcome is never retried bli
 %%{init: {"theme":"base","themeVariables":{"fontSize":"15px","lineColor":"#64748b","edgeLabelBackground":"#ffffff"}}}%%
 stateDiagram-v2
   direction TB
+  state "Shortlisted" as shortlisted
+  state "Selected" as selected
+  state "Drafted" as drafted
+  state "Rejected" as rejected
+  state "Executing" as executing
+  state "Replied" as replied
   state "Needs a person" as review
   state "Approved" as approved
   state "Outcome unknown" as unknown
@@ -494,13 +491,13 @@ Only the operator sets these. A request or a model cannot raise them. A model wi
 ### Crash, resume and exactly once
 
 ```mermaid
-%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","actorBkg":"#d4efe1","actorBorder":"#1e8a5a","actorTextColor":"#0b2a1c","noteBkgColor":"#fbecd0","noteBorderColor":"#c98a12","noteTextColor":"#3a2604","signalColor":"#64748b","signalTextColor":"#334155","labelBoxBkgColor":"#f8fafc"},"sequence":{"width":118,"actorMargin":34,"messageMargin":26,"mirrorActors":false,"wrap":true}}}%%
+%%{init: {"theme":"base","themeVariables":{"fontSize":"15px","actorBkg":"#d4efe1","actorBorder":"#1e8a5a","actorTextColor":"#0b2a1c","noteBkgColor":"#fbecd0","noteBorderColor":"#c98a12","noteTextColor":"#3a2604","signalColor":"#475569","signalTextColor":"#1e293b","labelBoxBkgColor":"#f8fafc"},"sequence":{"width":118,"actorMargin":34,"messageMargin":22,"mirrorActors":false,"wrap":true}}}%%
 sequenceDiagram
   participant P as Person
   participant R as Runner
   participant L as Ledger
   participant S as Service
-  rect rgba(47,111,208,0.10)
+  rect rgb(226,235,248)
     Note over P,S: Pay once
     R->>L: Hold worst-case cost
     R->>S: Paid call
@@ -512,7 +509,7 @@ sequenceDiagram
     L-->>R: Saved result
     Note over R,S: No second charge
   end
-  rect rgba(208,84,42,0.10)
+  rect rgb(250,233,225)
     Note over P,S: Act once
     P->>L: Approve exact text
     R->>L: Claim action
