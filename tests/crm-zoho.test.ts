@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Ledger } from "../src/ledger/ledger.js";
 import type { Lead } from "../src/buyer/contract.js";
+import { connectionView } from "../src/crm/api.js";
 import { Connections } from "../src/crm/credentials.js";
 import { CrmSync } from "../src/crm/engine.js";
 import { CrmHub } from "../src/crm/hub.js";
@@ -15,6 +16,7 @@ import { HubSpotSimulator } from "../src/crm/simulator.js";
 import { Zoho, readLine, writeLines } from "../src/crm/zoho.js";
 import { ZohoSimulator } from "../src/crm/zoho-simulator.js";
 
+const BOTH = ["hubspot", "zoho"] as const;
 const dirs: string[] = [];
 afterEach(() => { vi.unstubAllEnvs(); for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true }); });
 const file = () => { const d = mkdtempSync(join(tmpdir(), "crm-")); dirs.push(d); return join(d, "crm.json"); };
@@ -31,7 +33,7 @@ const lead = (id = "a", over: Partial<Lead> = {}): Lead => ({
 
 function setup(edition: "free" | "enterprise" = "enterprise", sim = new ZohoSimulator(edition), ledger = new Ledger(":memory:"), path = file(), notifyUrl?: string) {
   clearEnv();
-  const connections = new Connections(path);
+  const connections = new Connections(path, BOTH);
   connections.save("zoho", { provider: "zoho", client: "*", app_id: "id", app_secret: "secret", refresh_token: "refresh", accounts_url: "https://accounts.zoho.in", hook_secret: "hook" });
   const crm = new CrmSync(ledger, (meter, state) => new Zoho(meter, { tokens: new TokenSource(connections, "zoho", sim.fetch), state, fetch: sim.fetch, gapMs: 0, notifyUrl }));
   const id = (kind: "company" | "contact" | "deal", key = "a") => crm.store.link(key, kind)!.remote_id;
@@ -282,7 +284,7 @@ describe("Zoho sign-in, caps and notifications", () => {
 describe("connections and clients", () => {
   it("each client's leads go only to that client's CRM", async () => {
     clearEnv();
-    const c = new Connections(file()), hub = new Map<string, HubSpotSimulator>([["token-a", new HubSpotSimulator()], ["token-b", new HubSpotSimulator()]]);
+    const c = new Connections(file(), BOTH), hub = new Map<string, HubSpotSimulator>([["token-a", new HubSpotSimulator()], ["token-b", new HubSpotSimulator()]]);
     hub.get("token-b")!.portal = 2;
     for (const k of ["a", "b"]) c.save(`hubspot@${k}`, { provider: "hubspot", client: k, token: `token-${k}` });
     const http: typeof fetch = (url, init) => hub.get((init!.headers as any).authorization.slice(7))!.fetch(url, init);
@@ -294,7 +296,7 @@ describe("connections and clients", () => {
   });
   it("two clients cannot share one CRM account", async () => {
     clearEnv();
-    const c = new Connections(file()), sim = new HubSpotSimulator();
+    const c = new Connections(file(), BOTH), sim = new HubSpotSimulator();
     for (const k of ["a", "b"]) c.save(`hubspot@${k}`, { provider: "hubspot", client: k, token: k });
     const crm = new CrmHub(new Ledger(":memory:"), c, sim.fetch);
     await crm.push("r", [lead("one", { client_id: "a" })]);
@@ -302,7 +304,7 @@ describe("connections and clients", () => {
   });
   it("leads queued before a sign-in follow the CRM that gets connected", async () => {
     clearEnv();
-    const c = new Connections(file()), sim = new ZohoSimulator(), crm = new CrmHub(new Ledger(":memory:"), c, sim.fetch);
+    const c = new Connections(file(), BOTH), sim = new ZohoSimulator(), crm = new CrmHub(new Ledger(":memory:"), c, sim.fetch);
     expect(await crm.push("r", [lead()])).toMatchObject({ errors: 1 });
     c.save("zoho", { provider: "zoho", client: "*", app_id: "i", app_secret: "s", refresh_token: "r" });
     await crm.poll(new Map(), 0);
@@ -330,10 +332,28 @@ describe("connections and clients", () => {
   });
 });
 
+describe("what is on offer", () => {
+  it("HubSpot only: Zoho cannot be connected, picked or signed in to", async () => {
+    clearEnv();
+    vi.stubEnv("ZOHO_CLIENT_ID", "i"); vi.stubEnv("ZOHO_CLIENT_SECRET", "s"); vi.stubEnv("ZOHO_REFRESH_TOKEN", "r");
+    const c = new Connections(file()), hub = new CrmHub(new Ledger(":memory:"), c, vi.fn() as any);
+    c.save("zoho", { provider: "zoho", client: "*", app_id: "i", app_secret: "s", refresh_token: "r" });
+    expect(hub.describe()).toEqual([]); expect(hub.configured()).toBe(false);
+    expect(hub.pick()!.adapter.name).toBe("hubspot");
+    expect(connectionView(hub.pick()!, { hub }).providers).toEqual({ hubspot: "available", zoho: "coming_soon", salesforce: "coming_soon", pipedrive: "coming_soon" });
+    const route = createCrmRouter(hub), server = createServer(async (q, r) => { await route(q, r); });
+    await new Promise<void>(r => server.listen(0, "127.0.0.1", r));
+    try {
+      const r = await fetch(`http://127.0.0.1:${(server.address() as any).port}/api/crm/oauth/start?provider=zoho`, { redirect: "manual" });
+      expect(r.status).toBe(400); expect(await r.json()).toEqual({ error: "zoho is coming soon" });
+    } finally { startPolling(hub)(); server.close(); }
+  });
+});
+
 describe("browser sign-in and notification routes", () => {
   it("signs in once per state, refuses a foreign sign-in server, and wakes on a true token only", async () => {
     clearEnv();
-    const sim = new ZohoSimulator(), c = new Connections(file()), hub = new CrmHub(new Ledger(":memory:"), c, sim.fetch);
+    const sim = new ZohoSimulator(), c = new Connections(file(), BOTH), hub = new CrmHub(new Ledger(":memory:"), c, sim.fetch);
     c.save("zoho", { provider: "zoho", client: "*", app_id: "app", app_secret: "app-secret" });
     const route = createCrmRouter(hub), server = createServer(async (q, r) => { await route(q, r); });
     await new Promise<void>(r => server.listen(0, "127.0.0.1", r));

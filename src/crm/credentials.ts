@@ -9,6 +9,9 @@ import { NotConnected } from "./adapter.js";
  * Secrets live outside the repo in a file only this user can read, never in the ledger.
  */
 export type Provider = "hubspot" | "zoho";
+/** What a customer can connect. Zoho's adapter exists but is switched off until it is checked against a real account. */
+export const OFFERED: readonly Provider[] = ["hubspot"];
+export const COMING_SOON = ["zoho", "salesforce", "pipedrive"] as const;
 export interface Connection {
   /** Also the namespace of this connection's links and events in the ledger. */
   key: string;
@@ -48,7 +51,7 @@ export function zohoApi(url: unknown): string {
 }
 
 export class Connections {
-  constructor(readonly file = process.env.CRM_CONNECTIONS_FILE ?? join(homedir(), ".tradescout", "crm.json")) {}
+  constructor(readonly file = process.env.CRM_CONNECTIONS_FILE ?? join(homedir(), ".tradescout", "crm.json"), readonly offered: readonly Provider[] = OFFERED) {}
 
   private saved(): Connection[] {
     if (!existsSync(this.file)) return [];
@@ -57,14 +60,14 @@ export class Connections {
     if (!Array.isArray(data?.connections)) throw new NotConnected("the CRM connections file has no connection list");
     return data.connections;
   }
-  /** Saved connections, plus the two that can be set through the environment. */
+  /** Saved connections plus those set through the environment, for the CRMs on offer. */
   list(): Connection[] {
     const out = new Map<string, Connection>(), env = process.env;
     if (env.HUBSPOT_TOKEN) out.set("hubspot", { key: "hubspot", provider: "hubspot", client: "*", token: env.HUBSPOT_TOKEN, app_secret: env.HUBSPOT_CLIENT_SECRET });
     if (env.ZOHO_CLIENT_ID && env.ZOHO_CLIENT_SECRET && env.ZOHO_REFRESH_TOKEN)
       out.set("zoho", { key: "zoho", provider: "zoho", client: "*", app_id: env.ZOHO_CLIENT_ID, app_secret: env.ZOHO_CLIENT_SECRET, refresh_token: env.ZOHO_REFRESH_TOKEN, accounts_url: ZOHO_DCS[env.ZOHO_DC ?? "in"] ?? env.ZOHO_DC });
     for (const c of this.saved()) out.set(c.key, { ...out.get(c.key), ...c });
-    return [...out.values()];
+    return [...out.values()].filter(c => this.offered.includes(c.provider));
   }
   get(key: string): Connection | undefined { return this.list().find(c => c.key === key); }
 

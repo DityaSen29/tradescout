@@ -1,3 +1,4 @@
+import { COMING_SOON, OFFERED } from "./credentials.js";
 import type { CrmSync } from "./engine.js";
 import type { CrmHub } from "./hub.js";
 import type { Conflict } from "./store.js";
@@ -16,7 +17,7 @@ export function connectionView(sync: CrmSync, opts: { simulated?: boolean; hub?:
     queued: leads.filter(l => ["pending", "retry", "in_flight", "failed"].includes(l.state)).length,
     open_conflicts: conflicts.length,
     paused: paused.length,
-    providers: { hubspot: "implemented", zoho: "implemented" },
+    providers: Object.fromEntries([...OFFERED.map(p => [p, "available"]), ...COMING_SOON.map(p => [p, "coming_soon"])]),
   };
 }
 

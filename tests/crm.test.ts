@@ -246,7 +246,7 @@ describe("failures and caps", () => {
   it("Zoho without a sign-in says so and sends nothing", async () => {
     const http = vi.fn(), dir = mkdtempSync(join(tmpdir(), "crm-"));
     try {
-      const tokens = new TokenSource(new Connections(join(dir, "c.json")), "zoho", http as any);
+      const tokens = new TokenSource(new Connections(join(dir, "c.json"), ["zoho"]), "zoho", http as any);
       const r = await syncLeads(new Ledger(":memory:"), "r", [lead()], (m, state) => new Zoho(m, { tokens, state, fetch: http as any }));
       expect(r).toMatchObject({ created: 0, errors: 1 }); expect(r.details[0].message).toMatch(/not connected/);
       expect(http).not.toHaveBeenCalled();

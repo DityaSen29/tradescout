@@ -1,8 +1,8 @@
 /**
  *   npx tsx src/crm/demo.ts                      simulated HubSpot, no network
- *   npx tsx src/crm/demo.ts --zoho               simulated Zoho (add --free for the Free edition)
+ *   npx tsx src/crm/demo.ts --zoho               simulated Zoho, which is coming soon (add --free for the Free edition)
  *   npx tsx src/crm/demo.ts [--zoho] --serve     the same, then the panel with two decisions waiting
- *   npx tsx src/crm/demo.ts [--zoho] --live      the real connected account, two example leads
+ *   npx tsx src/crm/demo.ts --live              the real connected account, two example leads
  *   add --wait to --live to change the stage by hand in the CRM instead of by API
  */
 import { existsSync } from "node:fs";
@@ -41,6 +41,7 @@ async function main() {
   const hsim = !live && !zoho ? new HubSpotSimulator() : null;
   const zsim = !live && zoho ? new ZohoSimulator(flag("free") ? "free" : "enterprise") : null;
   const http: typeof fetch = hsim?.fetch ?? zsim?.fetch ?? fetch;
+  if (live && zoho) throw new Error("Zoho is coming soon; the live check is HubSpot only");
   let connections = new Connections();
   if (!live) {
     // the simulated run never reads or writes the real connections file

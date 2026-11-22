@@ -2,14 +2,14 @@
  * Save a CRM connection on this Mac. Secrets are typed at hidden prompts, never passed as arguments or pasted in chat.
  *   npx tsx src/crm/connect.ts hubspot               a service key
  *   npx tsx src/crm/connect.ts hubspot --oauth       an app's id and secret, then sign in in the browser
- *   npx tsx src/crm/connect.ts zoho --dc in          a Self Client's id, secret and code
+ *   Zoho, Salesforce and Pipedrive are coming soon.
  *   add --client <client_id> to give one client a CRM of its own
  */
 import { existsSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
 import { scrub } from "./adapter.js";
-import { Connections, keyOf, zohoAccounts } from "./credentials.js";
+import { Connections, keyOf, OFFERED, zohoAccounts } from "./credentials.js";
 import { exchangeCode, ZOHO_SCOPES } from "./oauth.js";
 
 function hidden(question: string): Promise<string> {
@@ -23,7 +23,8 @@ const option = (name: string) => { const i = args.indexOf(`--${name}`); return i
 
 async function main() {
   const provider = args[0];
-  if (provider !== "hubspot" && provider !== "zoho") throw new Error("usage: connect.ts hubspot|zoho [--client <id>] [--oauth] [--dc in|com|eu|au|jp|sa|ca|cn]");
+  if (provider !== "hubspot" && provider !== "zoho") throw new Error("usage: connect.ts hubspot [--client <id>] [--oauth]");
+  if (!OFFERED.includes(provider)) throw new Error(`${provider} is coming soon`);
   if (!process.stdin.isTTY) throw new Error("run this in a Terminal, so the secrets stay hidden");
   if (existsSync(".env")) process.loadEnvFile(".env");
   const client = option("client") ?? "*", key = keyOf(provider, client), saved = new Connections();

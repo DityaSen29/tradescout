@@ -56,6 +56,7 @@ export function createCrmRouter(target: CrmSync | CrmHub, opts: { simulated?: bo
         if (hub && path === "/api/crm/oauth/start") {
           const provider = q.get("provider") ?? "";
           if (provider !== "hubspot" && provider !== "zoho") return json(400, { error: "provider must be hubspot or zoho" });
+          if (!hub.connections.offered.includes(provider)) return json(400, { error: `${provider} is coming soon` });
           let to: string;
           try { to = hub.oauth.start(keyOf(provider as Provider, q.get("client") || "*"), `http://${host}`); }
           catch (e) { return json(400, { error: scrub(e) }); }
