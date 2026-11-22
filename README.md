@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 5:55 PM IST on 22 November 2026, at commit [`22c152e`](https://github.com/shivanshpilani/tradescout/commit/22c152e). The test results are from `a5bbb1d`. Later commits changed one API response and the submission answers.
+Every capability in this document carries one of these labels. Status is as of 5:57 PM IST on 22 November 2026, at commit [`7ff3c31`](https://github.com/shivanshpilani/tradescout/commit/7ff3c31).
 
 | Label | Meaning |
 |---|---|
@@ -20,7 +20,7 @@ Every capability in this document carries one of these labels. Status is as of 5
 | **Built, tested offline** | The code is on this branch and its tests pass. We are not claiming a live run of that specific case. |
 | **Built, simulated** | The code works against a fake version of the outside service. It has not touched the real one. |
 | **Being built** | In progress or on another branch. It is not part of this branch's product yet. |
-| **Roadmap** or **Coming soon** | Not built. |
+| **Roadmap** or **Coming soon** | Not available in the product yet. |
 
 In short: **the agents, Crustdata, the customs-file route, the ledger and the caps are live. CRM sync and outreach are built and tested on simulators, with no real send claimed. The redesigned interface is being built. Other CRMs are coming soon. Buyer intelligence is Feature 2.**
 
@@ -140,7 +140,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Swappable customs source | **Built** | Only the file adapter exists. No vendor API is connected. |
 | Local API, event stream and minimal interface | **Built** | Start, watch, select and approve from a browser |
 | Two-way CRM sync with HubSpot | **Built, simulated** | Never run against a real HubSpot account |
-| Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | HubSpot comes first |
+| Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | Only HubSpot is offered. Zoho adapter code exists but has only met a simulator. |
 | Gmail outreach, follow-ups, reply triage and alerts | **Built, simulated** | Wired into this branch and tested on a simulated mailbox. It can email only listed team test inboxes. No real send is claimed. |
 | Exclude the exporter's existing buyers, rank related parties last | **Built, tested offline** | Needs the exporter's company name in the brief |
 | Redesigned "Agent rail" interface | **Being built** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
@@ -200,10 +200,10 @@ The menthol runs also exposed real weaknesses:
 
 ### How we tested it
 
-On a fresh clone at `a5bbb1d`, with Node 22.14:
+On a fresh clone at `7ff3c31`, with Node 22.14:
 
-- **156 automated tests in eight files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, CRM sync and outreach.
-- **As shipped, 155 of 156 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 156 of 156 pass. The [run instructions](#tests) cover the real file.
+- **220 automated tests in nine files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, CRM sync and outreach.
+- **As shipped, 219 of 220 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 220 of 220 pass. The [run instructions](#tests) cover the real file.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
@@ -618,7 +618,7 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 | `src/actions/execute.ts` | The test-outbox executor |
 | `src/api/`, `public/` | Local API, event stream and minimal interface |
 | `src/outreach/` | Gmail, domain checks, follow-ups, reply triage, alerts and mailbox simulator |
-| `src/crm/` | CRM engine, HubSpot adapter and simulator, plus a placeholder for other CRMs |
+| `src/crm/` | CRM engine, HubSpot adapter and simulators. A Zoho adapter is tested on a simulator and not offered yet. |
 | [`docs/api.md`](https://github.com/shivanshpilani/tradescout/blob/pivot/agentic-buyer-desk/docs/api.md) | API and event contract |
 | `src/pipeline.ts`, `src/steps/`, `src/layers/`, `src/scoring/` | The earlier TradeScout product, kept for its tests and shared helpers |
 | `docs/submission.md` | The submission answers for this product |
