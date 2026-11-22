@@ -27,6 +27,10 @@ Every call is in a ledger with hard per-run and daily caps. A killed run resumes
 
 **Ran live today:** both routes end to end to checked drafts, and a kill and resume with no paid call repeated. One menthol run cost 12.5 Crustdata credits and $0.026 of model spend.
 
+**Exporter's origin:** read from the exporter's own brief, with a quote that code checks. If the brief doesn't say, India is assumed for ranking only and no email states an origin. A Vietnamese exporter's brief ran live to three checked drafts, all stating Viet Nam.
+
+**Built after the first freeze, inside the extension to 6:30 PM:** that origin change, a retry on model timeouts, and desk actions in the API (edit with critic re-check, batch approve, undo, pause-all). The desk actions are not wired into the interface.
+
 **Not live:** HubSpot sync is tested on a simulator. Gmail outreach and alerts are built and tested offline, limited to team test inboxes, and no email was sent to any buyer. Vendor customs APIs are an interface only. Buyer intelligence is Feature 2.
 
 **Where it needs a person:** selecting companies, importer names that don't resolve (often 2 to 5 of every 5 in our menthol runs), blocked drafts, every approval, and any action with an unknown outcome.
