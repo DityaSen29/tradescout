@@ -90,6 +90,7 @@ export class HubSpotSimulator {
         if (body.properties[k] && [...rows.values()].some(r => r.props[k] === body.properties[k])) return Response.json({ message: `${k} already exists` }, { status: 409 });
       return Response.json(this.out(this.seed(kind, body.properties)), { status: 201 });
     }
+    if (method === "GET" && !p[4]) return Response.json({ results: [...rows.values()].map(this.out) });
     const id = decodeURIComponent(p[4] ?? "");
     const row = url.searchParams.get("idProperty") === ID ? [...rows.values()].find(r => r.props[ID] === id) : rows.get(this.merged.get(`${kind}:${id}`) ?? id);
     if (!row) return gone();
