@@ -4,7 +4,7 @@ import type { Kind, Props } from "./adapter.js";
 /** The only lead data that may leave for a CRM. No claims, reasons, customs behaviour, scores or product. */
 export interface SyncLead {
   lead_id: string; client_id: string; company: string; domain: string; match: string; status: string;
-  contact: { first: string; last: string; title: string; email: string } | null;
+  contact: { first: string; last: string; title: string; email: string; person: string } | null;
 }
 export interface Mapped { props: Props; natural: string }
 
@@ -24,7 +24,7 @@ export function minimise(lead: Lead, status: string): SyncLead {
   return {
     lead_id: lead.lead_id, client_id: lead.client_id, company, status: clean(status), match: clean(lead.match),
     domain: /^[a-z0-9.-]+\.[a-z0-9-]{2,}$/.test(host) ? host : "",
-    contact: c && (name.length || email) ? { first: name[0] ?? "", last: name.slice(1).join(" "), title: clean(c.title), email } : null,
+    contact: c && (name.length || email) ? { first: name[0] ?? "", last: name.slice(1).join(" "), title: clean(c.title), email, person: clean(c.person_id) } : null,
   };
 }
 
@@ -33,7 +33,7 @@ const present = (names: readonly string[], values: string[]): Props => Object.fr
 
 export function mapLead(l: SyncLead, ours: Record<Kind, readonly string[]>): Record<Kind, Mapped | null> {
   return {
-    company: { natural: l.domain, props: present(ours.company, [l.company, l.domain]) },
+    company: { natural: l.domain || `name:${l.company.toLowerCase()}`, props: present(ours.company, [l.company, l.domain]) },
     contact: l.contact && { natural: l.contact.email, props: present(ours.contact, [l.contact.first, l.contact.last, l.contact.title, l.contact.email]) },
     deal: { natural: "", props: present(ours.deal, [l.company, l.match, l.status]) },
   };
