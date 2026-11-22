@@ -96,7 +96,7 @@ async function runSteps(ledger: Ledger, runId: string, steps: StepDef[], opts: R
   return outputs;
 }
 
-function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: Record<string, unknown>, step: string, log: (m: string) => void): StepCtx {
+export function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: Record<string, unknown>, step: string, log: (m: string) => void): StepCtx {
   return {
     runId, request, ledger, outputs, step, log,
     evidence: (subject, e) => { ledger.addEvidence(runId, step, subject, e); },

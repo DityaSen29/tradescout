@@ -5,6 +5,7 @@ import { extname, join, normalize } from "node:path";
 import { Ledger } from "../ledger/ledger.js";
 import { runPipeline } from "../runner/pipeline.js";
 import { buildBuyerPipeline as buildPipeline } from "../buyer/pipeline.js";
+import { editDraft } from "../buyer/edit.js";
 import { MAX_SELECTED } from "../buyer/select.js";
 import { RequestSchema } from "../core/types.js";
 import { emit, reopen, subscribe, history } from "./events.js";
@@ -31,6 +32,15 @@ const PORT = Number(process.env.PORT ?? 8787);
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"].map(h => `${h}:${PORT}`));
 const ledger = new Ledger();
 const running = new Set<string>();
+/** A failure the screen can act on, without reading error text. */
+function failureOf(run: { status: string }, steps: any[]) {
+  if (run.status !== "failed" && run.status !== "budget_exceeded") return null;
+  const s = steps.find(x => x.status === "failed");
+  const message = String(s?.error ?? "").split("\n")[0];
+  const type = run.status === "budget_exceeded" ? "budget" : /needs input/.test(message) ? "needs_input" : /cannot verify/.test(message) ? "cannot_verify"
+    : /fetch failed|timeout|aborted/i.test(message) ? "network" : /\b429\b/.test(message) ? "rate_limited" : /\b40[123]\b/.test(message) ? "provider_refused" : "internal";
+  return { type, step: s?.name ?? null, message, resumable: ["network", "rate_limited", "internal", "provider_refused"].includes(type) };
+}
 const crm = createCrmRouter(crmFor(ledger));
 if (process.env.HUBSPOT_TOKEN) startPolling(crmFor(ledger));
 // Email goes only to the exact team inboxes listed here. With none listed, an approved draft is written to a file.
@@ -113,7 +123,16 @@ const server = createServer(async (req, res) => {
         label: l.match, reason: l.related_party ? `${l.match_reason}; related party, ranked last` : l.match_reason,
         record_dates: l.behaviour ? { first: l.behaviour.first_month || null, last: l.behaviour.last_month || null } : null,
         retrieved_at: l.claims[0]?.retrieved_at ?? null }]));
-      return json(res, 200, { coverage, calls, trust, shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
+      const byStep = new Map<string, { step: string; calls: number; failed: number; inr: number }>();
+      for (const c of calls) {
+        const e = byStep.get(c.step) ?? { step: c.step, calls: 0, failed: 0, inr: 0 };
+        e.calls++; if (c.status === "error") e.failed++;
+        e.inr += costOf({ credits_used: c.credits, model_cost_usd: c.model_cost_usd }).estimated_inr;
+        byStep.set(c.step, e);
+      }
+      const spent = [...byStep.values()].reduce((n, e) => n + e.inr, 0);
+      const step_costs = [...byStep.values()].map(e => ({ ...e, inr: Number(e.inr.toFixed(2)), share: spent ? Number((e.inr / spent).toFixed(3)) : 0 }));
+      return json(res, 200, { step_costs, failure: failureOf(run, ledger.listSteps(id)), paused_all: ledger.isPaused(), coverage, calls, trust, shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
@@ -160,16 +179,39 @@ const server = createServer(async (req, res) => {
       return json(res, 404, { error: `record ${id} not found in stored responses for ${endpoint}` });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph }); }
+    if (p === "/api/pause" && m === "GET") return json(res, 200, { paused: ledger.isPaused() });
+    if (p === "/api/pause" && m === "POST") {
+      const { paused } = await readBody(req);
+      if (typeof paused !== "boolean") return json(res, 400, { error: "paused is true or false" });
+      ledger.setPaused(paused);
+      return json(res, 200, { paused });
+    }
+    if (p === "/api/actions/batch-approve" && m === "POST") {
+      const { items } = await readBody(req);
+      if (!Array.isArray(items) || !items.length || items.length > 50) return json(res, 400, { error: "items is 1 to 50 of {id, draft_hash}" });
+      return json(res, 200, { results: items.map((i: any) => ledger.approveExact(String(i?.id ?? ""), String(i?.draft_hash ?? ""))) });
+    }
+    if ((mm = p.match(/^\/api\/actions\/([^/]+)\/undo$/)) && m === "POST") {
+      return ledger.undoDecision(mm[1]) ? json(res, 200, ledger.getAction(mm[1])) : json(res, 409, { error: "nothing to undo, or it has already gone out" });
+    }
+    if ((mm = p.match(/^\/api\/actions\/([^/]+)\/edit$/)) && m === "POST") {
+      const b = await readBody(req);
+      if (![b.subject, b.text, b.draft_hash].every(x => typeof x === "string") || b.text.length > 3000) return json(res, 400, { error: "send subject, text (the body without greeting and sign-off) and draft_hash" });
+      const r = await editDraft(ledger, mm[1], b);
+      return json(res, r.ok ? 200 : 422, r);
+    }
     if ((mm = p.match(/^\/api\/actions\/([^/]+)\/(approve|reject|execute)$/)) && m === "POST") {
       const [, id, verb] = mm;
       if (verb === "execute") {
+        if (ledger.isPaused()) return json(res, 200, { ran: false, reason: "Everything is paused. Resume before executing." });
         if (emailTestMode && ledger.getAction(id)?.kind === "email_draft") {
           const r = await executeDraft(ledger, id);
           return json(res, 200, { ...r, ran: r.sent, action: ledger.getAction(id) });
         }
         return json(res, 200, await executeApproved(ledger, id));
       }
-      ledger.decideAction(id, verb === "approve" ? "approved" : "rejected");
+      const why = verb === "reject" ? (await readBody(req)).reason : undefined;
+      ledger.decideAction(id, verb === "approve" ? "approved" : "rejected", "person", typeof why === "string" ? why.slice(0, 300) : undefined);
       return json(res, 200, ledger.getAction(id));
     }
     // static frontend

@@ -61,6 +61,8 @@ export interface Lead {
   needs_person: string[];
   /** The importer's supplier that looks like its own parent or sister company. Ranked last. */
   related_party?: string;
+  /** Share of this importer's matching records that come from the seller's own country, 0 to 1. Internal. */
+  origin_share?: number;
 }
 
 /** Payload of a ledger action of kind "email_draft". */

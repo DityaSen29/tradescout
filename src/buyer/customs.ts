@@ -157,6 +157,8 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
       match: matched.length ? "import_record" : "category_match", score,
       reason: matched.length ? `${matched.length} import record(s) whose description is this product` : "imports under the HS code; the description is blank or a different product" });
     lead.behaviour = b;
+    const withOrigin = used.filter(x => x.origin);
+    if (withOrigin.length) lead.origin_share = Number((withOrigin.filter(x => buysFrom([x], origin.iso3)).length / withOrigin.length).toFixed(2));
     const kin = used.filter(x => isRelatedParty(x.importer, x.supplier));
     if (kin.length) {
       const share = kin.length / used.length;

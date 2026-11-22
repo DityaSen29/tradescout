@@ -65,6 +65,7 @@ export class Ledger {
         id TEXT PRIMARY KEY, run_id TEXT NOT NULL, provider TEXT NOT NULL, day TEXT NOT NULL,
         units REAL NOT NULL, state TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS spend_provider_day ON spend(provider, day);
+      CREATE TABLE IF NOT EXISTS controls (name TEXT PRIMARY KEY, value TEXT NOT NULL, at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS selections (run_id TEXT PRIMARY KEY, lead_ids TEXT NOT NULL, at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS run_leases (run_id TEXT PRIMARY KEY, owner TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS snapshots (
@@ -254,10 +255,10 @@ export class Ledger {
   listActions(runId: string): ProposedAction[] {
     return (this.db.prepare(`SELECT * FROM actions WHERE run_id=? ORDER BY created_at`).all(runId) as any[]).map(r => this.rowToAction(r));
   }
-  decideAction(id: string, decision: "approved" | "rejected", who = "person") {
+  decideAction(id: string, decision: "approved" | "rejected", who = "person", reason?: string) {
     const res = this.db.prepare(`UPDATE actions SET status=? WHERE id=? AND status='proposed'`).run(decision, id);
     if (res.changes === 0) throw new Error(`action ${id} is not awaiting a decision`);
-    this.db.prepare(`UPDATE actions SET result_json=? WHERE id=?`).run(JSON.stringify({ decided_by: who, at: now() }), id);
+    this.db.prepare(`UPDATE actions SET result_json=? WHERE id=?`).run(JSON.stringify({ decided_by: who, at: now(), ...(reason ? { reason } : {}) }), id);
   }
   /**
    * Execute an approved action at most once. The claim is a single write transaction, and it also refuses
@@ -269,7 +270,7 @@ export class Ledger {
       const r = this.db.prepare(`SELECT status, executor, payload_json FROM actions WHERE id=?`).get(id) as any;
       if (r?.status === "executing" && (!r.executor || !ownerAlive(r.executor)))
         this.db.prepare(`UPDATE actions SET status='unknown' WHERE id=?`).run(id);
-      if (r?.status !== "approved") return null;
+      if (r?.status !== "approved" || this.isPaused()) return null;      // pause-all stops every executor here
       const key = JSON.parse(r.payload_json).dedupe_key;
       if (key) {
         const twin = this.db.prepare(`SELECT id FROM actions WHERE id<>? AND status IN ('executing','executed','unknown') AND json_extract(payload_json,'$.dedupe_key')=?`).get(id, key);
@@ -292,6 +293,36 @@ export class Ledger {
     } finally {
       ownTokens.delete(owner);
     }
+  }
+  /** Approve exactly the text that was shown. Repeating the same approval is harmless. */
+  approveExact(id: string, draftHash: string): { id: string; ok: boolean; reason?: string } {
+    return this.atomic(() => {
+      const a = this.getAction(id);
+      if (!a) return { id, ok: false, reason: "no such draft" };
+      if (!draftHash || a.payload.draft_hash !== draftHash) return { id, ok: false, reason: "the draft changed since it was shown" };
+      if (a.status === "approved") return { id, ok: true };
+      if (a.status !== "proposed") return { id, ok: false, reason: `it is ${a.status}` };
+      this.decideAction(id, "approved");
+      return { id, ok: true };
+    });
+  }
+  /** Back to waiting. Only while nothing has been executed. */
+  undoDecision(id: string): boolean {
+    return this.db.prepare(`UPDATE actions SET status='proposed', result_json=NULL WHERE id=? AND status IN ('approved','rejected') AND executor IS NULL`).run(id).changes === 1;
+  }
+  /** An edit voids any approval. */
+  reviseDraft(id: string, previousHash: string, payload: object): boolean {
+    return this.db.prepare(`UPDATE actions SET payload_json=?, status='proposed', result_json=NULL WHERE id=? AND status IN ('proposed','approved') AND json_extract(payload_json,'$.draft_hash')=?`).run(JSON.stringify(payload), id, previousHash).changes === 1;
+  }
+  /** The time ceiling counts active work: an edit long after the run is new work. */
+  restartClock(runId: string) {
+    this.db.prepare(`UPDATE runs SET clock_started_at=? WHERE id=?`).run(now(), runId);
+  }
+  setPaused(paused: boolean) {
+    this.db.prepare(`INSERT INTO controls VALUES ('paused',?,?) ON CONFLICT(name) DO UPDATE SET value=excluded.value, at=excluded.at`).run(paused ? "1" : "0", now());
+  }
+  isPaused(): boolean {
+    return (this.db.prepare(`SELECT value FROM controls WHERE name='paused'`).get() as any)?.value === "1";
   }
   /** A person checked what really happened to an action with an unknown outcome. */
   reconcileAction(id: string, outcome: "done" | "not-done") {

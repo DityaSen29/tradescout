@@ -20,6 +20,11 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 | `POST /api/runs/:id/resume`, `/retry` | retry: `{from}` | continues from checkpoints |
 | `GET /api/runs/:id/ledger`, `/evidence` | | every call and cost, every claim |
 | `GET /api/runs` | | recent runs |
+| `POST /api/actions/:id/edit` | `{subject, text, draft_hash}`; text has no greeting or sign-off | re-runs both gates. `{ok, draft_hash}` or 422 `{problems}`. Voids approval |
+| `POST /api/actions/batch-approve` | `{items: [{id, draft_hash}]}` | `{results: [{id, ok, reason?}]}`. Safe to repeat |
+| `POST /api/actions/:id/undo` | | back to proposed, only if nothing was executed |
+| `POST /api/actions/:id/reject` | `{reason?}` | the action |
+| `GET`, `POST /api/pause` | `{paused}` | pause-all: no executor can act while paused |
 | `GET /api/modules` | | modules with status, pipeline stages, outreach mode |
 | `GET /api/limits` | | today's spend against the caps |
 | `/api/crm/*` | | see `src/crm/README.md` |
@@ -28,6 +33,8 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 `run.status`: `running`, `awaiting_person` (show the selection), `done`, `failed`, `budget_exceeded`.
 
 Steps: `plan`, `customs`, `research`, `shortlist`, `select`, `contacts`, `write`, `report`.
+
+`GET /api/runs/:id` also has `step_costs` (rupees and share per step), `failure` (`{type, step, message, resumable}`) and `paused_all`. Leads from customs carry `origin_share`.
 
 ## Events
 
