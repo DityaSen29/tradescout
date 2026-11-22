@@ -346,6 +346,9 @@ flowchart TB
   DB --> BOX
   DB -.-> CRM
   DB -.-> MAIL
+  CU ~~~ BOX
+  CD ~~~ CRM
+  GM ~~~ MAIL
   classDef live fill:#d4efe1,stroke:#1e8a5a,stroke-width:2px,color:#0b2a1c
   classDef tested fill:#dbe7fb,stroke:#2f6fd0,stroke-width:2px,color:#0c2147
   classDef sim fill:#eee3fa,stroke:#7c4bc0,stroke-width:2px,color:#2a1446
