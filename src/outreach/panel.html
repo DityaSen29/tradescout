@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Outreach desk</title>
+<style>
+:root{color-scheme:light;--ink:#1b2a41;--soft:#5b6678;--rule:#d5dad0;--paper:#f3f5f1;--ok:#2e7d5b;--warn:#8a5a00;--fail:#a33a2b}
+body{margin:0;font:14px/1.45 "IBM Plex Sans",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+header{display:flex;gap:10px 18px;align-items:baseline;flex-wrap:wrap;padding:14px 20px;background:#fff;border-bottom:2px solid var(--ink)}
+h1{font-size:22px;margin:0}h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;margin:0}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:16px;padding:16px;align-items:start}
+section{background:#fff;border:1px solid var(--rule);padding:12px;min-width:0}.item{border-top:1px solid var(--rule);padding:9px 0;overflow-wrap:anywhere}
+.soft{color:var(--soft)}.ok{color:var(--ok)}.warn{color:var(--warn)}.fail,.unknown{color:var(--fail)}.tag{border:1px solid currentColor;padding:1px 7px;border-radius:9px;font-size:12px}
+p{margin:4px 0}pre{white-space:pre-wrap;font:inherit;margin:6px 0}button,select,input,textarea{font:inherit;padding:4px 8px;max-width:100%;box-sizing:border-box}
+.bar{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}textarea{width:100%}input[type=number]{width:76px}#msg{min-height:20px;flex-basis:100%;margin:0}
+</style></head>
+<body>
+<header><h1>Outreach</h1><span id="state" class="tag">loading</span><span class="soft">Buyer intelligence: feature 2, coming later</span>
+<button data-act="tick">Check replies and send what is due</button><p id="msg" role="status"></p></header>
+<main>
+<section><h2>Mailbox health and caps</h2><div id="boxes"></div></section>
+<section><h2>Campaigns</h2><div id="campaigns"></div></section>
+<section><h2>Emails to act on</h2><div id="drafts"></div></section>
+<section><h2>Leads</h2><div id="leads"></div></section>
+<section><h2>Alerts</h2><p id="channels" class="soft"></p><div class="bar"><button data-act="status">Send status</button><button data-act="telegram">Link Telegram</button></div><div id="alerts"></div></section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const when = t => t ? new Date(t).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+const btn = (act, id, text, extra = "") => `<button data-act="${act}" data-id="${esc(id)}" ${extra}>${text}</button>`;
+let D;
+function set(id, html) { const el = $(id); if (el.contains(document.activeElement) && document.activeElement.matches("input,textarea,select")) return; if (el.dataset.h !== html) { el.innerHTML = html; el.dataset.h = html; } }
+async function api(path = "", body) {
+  const r = await fetch("/api/outreach" + path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+  const j = await r.json(); if (!r.ok) throw new Error(j.error); return j;
+}
+async function load() {
+  D = await api();
+  $("#state").textContent = D.simulated ? "Simulation: nothing is emailed" : `Test mode: ${D.test_recipients.length} inboxes may be emailed`;
+  set("#boxes", (D.simulated ? "" : D.google_client ? '<a href="/api/outreach/connect">Connect Gmail</a>' : '<p class="fail">No Google client yet. See docs/outreach.md.</p>') + D.mailboxes.map(m => `<div class="item"><h3>${esc(m.email)}</h3><p>${m.cap.used} of ${m.cap.limit} sent today. ${esc(m.cap.reason)}</p>
+    ${m.health ? ["spf", "dkim", "dmarc"].map(k => `<p><b class="${m.health[k].level}">${k.toUpperCase()} ${m.health[k].level}</b> ${esc(m.health[k].summary)} ${m.health[k].fix ? `<span class="soft">${esc(m.health[k].fix)}</span>` : ""}</p>`).join("") : ""}
+    <div class="bar"><label>Daily cap <input type="number" min="0" max="40" data-cap="${esc(m.email)}" value="${esc(m.manual_cap)}" placeholder="ramp"></label>${btn("health", m.email, "Save and check")}</div></div>`).join(""));
+  set("#campaigns", D.campaigns.map(c => `<div class="item"><h3>${esc(c.client_id)} ${c.paused ? '<span class="fail">paused</span>' : ""}</h3><div class="bar">
+    <label>Mode <select data-mode="${esc(c.client_id)}"><option value="approval" ${c.mode === "approval" ? "selected" : ""}>Approval</option><option value="auto" ${c.mode === "auto" ? "selected" : ""}>Full auto</option></select></label>
+    <label>From <select data-box="${esc(c.client_id)}"><option value="">choose</option>${D.mailboxes.map(m => `<option ${m.email === c.mailbox ? "selected" : ""}>${esc(m.email)}</option>`).join("")}</select></label>
+    ${btn("pause", c.client_id, c.paused ? "Resume" : "Pause")}</div>
+    <details><summary>Booking link and product file (${c.product_facts.length} facts)</summary><input data-link="${esc(c.client_id)}" value="${esc(c.booking_url)}" placeholder="https://cal.com/..." aria-label="Booking link"><textarea rows="5" data-facts="${esc(c.client_id)}" aria-label="Product facts, one a line">${esc(c.product_facts.map(f => f.text).join("\n"))}</textarea>${btn("setup", c.client_id, "Save")}</details></div>`).join("") || "Campaigns appear when drafts exist.");
+  set("#drafts", D.drafts.map(d => `<div class="item"><h3>${esc(d.company)} <span class="tag">${d.kind === "reply" ? "answer" : `email ${esc(d.step)} of 4`}</span> <span class="tag">${esc(d.status)}</span></h3>
+    ${d.plan ? `<p class="soft">Next action: ${esc(d.plan.action.replace("_", " "))}. ${esc(d.plan.reason)} (${esc(d.plan.by)})</p>` : ""}${d.blocked ? `<p class="warn">${esc(d.blocked)}</p>` : ""}
+    <details><summary>${esc(d.subject)} to ${esc(d.to)}</summary><pre>${esc(d.body)}</pre></details><div class="bar">
+    ${d.status === "proposed" ? btn("approve", d.id, "Approve") + btn("reject", d.id, "Reject") : ""}${d.status === "approved" ? btn("send", d.id, "Send now") : ""}${d.status === "unknown" ? btn("check", d.id, "Check Sent and retry") : ""}</div></div>`).join("") || "Nothing waiting.");
+  set("#leads", D.conversations.slice().sort((a, b) => b.score - a.score).map(e => `<div class="item"><h3>${esc(e.company || e.recipient)} <span class="tag" title="${esc(e.signals.join("; "))}">score ${e.score}</span> <span class="tag">${esc(e.reason || e.state)}</span></h3>
+    <p class="soft">${e.sent} of ${e.total} sent${e.next_due ? `, next due ${when(e.next_due)}` : ""}</p>${e.replies.map(r => `<p><b>${esc((r.label || "reading").replaceAll("_", " "))}</b> ${esc(r.text)}</p>`).join("")}
+    <div class="bar">${e.state === "active" ? btn("stop", e.id, "Stop") : ""}${e.state !== "booked" ? btn("booked", e.id, "Meeting booked") : ""}${D.simulated ? `<input data-reply="${esc(e.id)}" placeholder="simulated reply" aria-label="Simulated reply">${btn("simreply", e.id, "Reply as buyer")}` : ""}</div></div>`).join("") + (D.simulated ? `<div class="bar">${btn("advance", "3", "Skip 3 days")}${btn("advance", "4", "Skip 4 days")}${btn("advance", "7", "Skip 7 days")}</div>` : "") || "No one is in a sequence.");
+  $("#channels").textContent = `Desk and console on. Telegram: ${D.channels.telegram.replace("_", " ")}. Email: ${D.channels.email || "off"}.`;
+  set("#alerts", D.alerts.map(a => `<div class="item"><pre>${esc(a.text)}</pre><small class="soft">${when(a.at)}, Telegram ${esc(a.telegram)}, email ${esc(a.email)}</small></div>`).join(""));
+}
+async function act(fn) {
+  try { const r = await fn(); $("#msg").textContent = r?.reason || "Done."; } catch (e) { $("#msg").textContent = e.message; }
+  document.activeElement?.blur(); await load();
+}
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("button[data-act]"); if (!b) return;
+  const id = b.dataset.id, a = b.dataset.act, val = k => document.querySelector(`[data-${k}="${CSS.escape(id)}"]`).value;
+  if (["approve", "reject", "send", "check"].includes(a)) return act(() => api(`/drafts/${id}/${a}`, { hash: D.drafts.find(d => d.id === id)?.hash }));
+  if (a === "stop" || a === "booked") return act(() => api(`/conversations/${id}/${a}`, {}));
+  if (a === "tick") return act(() => api("/tick", {}));
+  if (a === "pause") return act(() => api("/campaigns", { client_id: id, paused: !D.campaigns.find(c => c.client_id === id).paused }));
+  if (a === "health") return act(() => api("/mailboxes", { email: id, daily_cap: val("cap") === "" ? null : Number(val("cap")) }));
+  if (a === "setup") return act(() => api("/campaigns", { client_id: id, booking_url: val("link"), product_facts: val("facts").split("\n") }));
+  if (a === "status") return act(() => api("/alerts/status", {}));
+  if (a === "telegram") return act(async () => { const r = await api("/alerts/telegram", {}); return { reason: r.linked ? "Telegram is linked." : `Open ${r.url}, press Start, then click Link Telegram again.` }; });
+  if (a === "simreply") return act(() => api("/sim/reply", { conversation_id: id, text: val("reply") }));
+  if (a === "advance") return act(() => api("/sim/advance", { days: Number(id) }));
+});
+document.addEventListener("change", ev => {
+  const t = ev.target;
+  if (t.dataset.box !== undefined) return act(() => api("/campaigns", { client_id: t.dataset.box, mailbox: t.value }));
+  if (t.dataset.mode === undefined) return;
+  if (t.value === "auto" && !confirm("Full auto sends first emails and follow-ups without a click on each. Answers to replies still wait for you. Turn it on?")) { t.value = "approval"; return; }
+  act(() => api("/campaigns", { client_id: t.dataset.mode, mode: t.value, confirm_auto: t.value === "auto" }));
+});
+load().catch(e => ($("#msg").textContent = e.message));
+setInterval(() => load().catch(() => {}), 8000);
+</script></body></html>
