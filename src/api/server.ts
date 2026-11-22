@@ -9,6 +9,7 @@ import { MAX_SELECTED } from "../buyer/select.js";
 import { RequestSchema } from "../core/types.js";
 import { emit, reopen, subscribe, history } from "./events.js";
 import { STAGES } from "../buyer/contract.js";
+import { executeDraft, Outreach, outreachRoutes, startWorker } from "../outreach/index.js";
 import { createCrmRouter, crmFor, startPolling, syncLeads } from "../crm/index.js";
 import { executeApproved } from "../actions/execute.js";
 
@@ -32,11 +33,16 @@ const ledger = new Ledger();
 const running = new Set<string>();
 const crm = createCrmRouter(crmFor(ledger));
 if (process.env.HUBSPOT_TOKEN) startPolling(crmFor(ledger));
+// Email goes only to the exact team inboxes listed here. With none listed, an approved draft is written to a file.
+const emailTestMode = !!process.env.OUTREACH_TEST_RECIPIENTS?.trim();
+const outreach = new Outreach(ledger);
+const handleOutreach = outreachRoutes(ledger, outreach);
+if (emailTestMode) startWorker(outreach);
 
 const MODULES = [
   { id: "buyer_desk", name: "Find, prove and approach buyers", status: "live" },
   { id: "crm_sync", name: "Two-way CRM sync", status: process.env.HUBSPOT_TOKEN ? "live" : "needs_connection" },
-  { id: "outreach", name: "Campaign runner, mailbox health and alerts", status: "building" },
+  { id: "outreach", name: "Campaign runner, mailbox health and alerts", status: emailTestMode ? "test_inboxes_only" : "needs_connection" },
   { id: "buyer_intelligence", name: "Buyer intelligence", status: "coming_next", label: "Feature 2", description: "Reorder rhythm, next buying window, share of wallet and supplier switching, from import records" },
 ];
 /** Rupees are estimates: set the two rates from your own invoices. */
@@ -77,6 +83,7 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const p = url.pathname; const m = req.method ?? "GET";
   try {
+    if (await handleOutreach(req, res)) return;
     if (await crm(req, res)) return;      // it applies the same local-only guard itself
     // approvals and paid runs are local only: no other site, and no rebound hostname, may drive them
     const origin = req.headers.origin;
@@ -147,7 +154,13 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph }); }
     if ((mm = p.match(/^\/api\/actions\/([^/]+)\/(approve|reject|execute)$/)) && m === "POST") {
       const [, id, verb] = mm;
-      if (verb === "execute") return json(res, 200, await executeApproved(ledger, id));
+      if (verb === "execute") {
+        if (emailTestMode && ledger.getAction(id)?.kind === "email_draft") {
+          const r = await executeDraft(ledger, id);
+          return json(res, 200, { ...r, ran: r.sent, action: ledger.getAction(id) });
+        }
+        return json(res, 200, await executeApproved(ledger, id));
+      }
       ledger.decideAction(id, verb === "approve" ? "approved" : "rejected");
       return json(res, 200, ledger.getAction(id));
     }

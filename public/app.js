@@ -85,7 +85,7 @@ $("#resume").onclick = guarded(async () => { await api(`/runs/${current}/resume`
 $("#drafts").onclick = guarded(async (e) => {
   const v = e.target.dataset.v; if (!v) return;
   const r = await api(`/actions/${e.target.closest("[data-id]").dataset.id}/${v}`, {});
-  if (v === "execute" && r.ran === false) alert("Not written: this buyer already has an executed or unresolved email.");
+  if (v === "execute" && r.ran === false) alert(r.reason || "Not written: this buyer already has an executed or unresolved email.");
   await open(current);
 });
 loadRuns().catch((err) => { $("#status").textContent = err.message; });

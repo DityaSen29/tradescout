@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { fetchOnce } from "../core/net.js";
 import type { StepCtx } from "../runner/pipeline.js";
 
 /**
@@ -27,11 +28,11 @@ async function generate(model: string, system: string, prompt: string, maxOut: n
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new LlmError(401, "GEMINI_API_KEY is not set: the agents cannot run");
   for (let attempt = 0; ; attempt++) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    const res = await fetchOnce(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, () => ({
       method: "POST", headers: { "content-type": "application/json", "x-goog-api-key": key }, signal: AbortSignal.timeout(45_000),
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", temperature: 0.1, maxOutputTokens: maxOut } }),
-    });
+    }));
     if ((res.status === 429 || res.status === 503) && attempt < 2) { await new Promise(r => setTimeout(r, 2000 * 2 ** attempt)); continue; }
     if (!res.ok) throw new LlmError(res.status, `model call failed (${res.status})`);
     const d: any = await res.json();
