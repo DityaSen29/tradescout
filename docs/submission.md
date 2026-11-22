@@ -1,21 +1,41 @@
-# Submission form answers (checkpoint 2:30 PM, final before 6:00 PM)
+# Submission form answers
 
 **Team name:** (use the same name every time)
 
-**One line:** An export sourcing desk: product and market in; a cited market signal, duty and policy picture, vetted counterparties with a trust tier, the right buyer at each, and a drafted first email that waits for a person's approval.
+**One line:** Meridian drives revenue for export businesses via distribution intelligence: product, HSN and market in; buyers with evidence, the person who decides, and an email checked against that evidence, waiting for approval.
 
-**Theme:** Supply chain, with Trust and compliance (own combination).
+**Theme:** Services, Replaced: the export sales desk and buyer-research service.
 
-**GitHub repo:** https://github.com/Jeevannnn20/tradescout
+**GitHub repo:** https://github.com/shivanshpilani/tradescout/tree/pivot/agentic-buyer-desk (pull request to the team's original repo: https://github.com/Jeevannnn20/tradescout/pull/2)
 
-**Demo video:** (one Loom / unlisted YouTube / Drive link, two minutes, a request it has never seen)
+**Demo video:** (one Loom / unlisted YouTube / Drive link)
 
 **How does your product work?**
-Ten checkpointed steps on live data: parse the request (HS code, ISO3, keyword map; asks back when the HS code is a near-tie, stops when the country cannot be verified), market (UN Comtrade, three years), duty (World Bank WITS, sector level, India vs MFN), policy (dated news naming the market; undated items go to a person), find counterparties (one Crustdata company search, fit by rules, duplicates merged, lookalikes flagged), vet (enrich top five, OFAC and UN name screen, adverse news, deterministic trust tier where missing data is AMBER), buying signals (job postings), find the buyer (person search, name/title/employer only), draft (proposed action, nothing sent), report (ranked over an in-memory context graph, every claim with a source link that opens the stored record). Where it still needs a person: HS ambiguity, undated policy mentions, counterparties without a record, name-only sanctions matches, approving and sending every draft. Approaches considered: wide search then rank (chosen) vs many narrow searches; rules (chosen) vs an LLM judge; line-level tariffs (WITS refused) vs sector level. Models and tools: no LLM calls in this build; Node 26, TypeScript, Node's built-in sqlite, plain node:http, vanilla JS UI. Next: shipment-record evidence, weekly watcher, an LLM for messy requests behind the same evidence contract.
+Agents think inside a step. Code owns the order, money, state and every action.
 
-**Diagram:** https://github.com/Jeevannnn20/tradescout/blob/main/docs/architecture.md
+1. A planner agent turns product and HSN into an exact product spec, HS codes (each checked against the HS 2022 list) and typed customs queries.
+2. Where customs records exist, code runs the queries on export files and computes importers, records, volume and price. A model sees only redacted product descriptions, to pick the exact product.
+3. Where they don't, or too few records show the exact product, a researcher agent picks its own Crustdata tools (company search, web search, page read, company lookup) and iterates. Code checks each quote, then a critic agent tries to refute it and can send the researcher back once. This route never claims an import.
+4. The client's own buyers and its don't-contact list are removed, and related-party importers are ranked last.
+5. A person selects up to five companies. Only then does paid enrichment run: an identity critic rejects same-named strangers, and Crustdata finds the decision-maker and work email.
+6. A copywriter agent writes from that buyer's accepted claims. Code and a draft critic check every sentence, and two failures block the draft.
+7. A person approves.
+
+Every call is in a ledger with hard per-run and daily caps. A killed run resumes from checkpoints.
+
+**Models and tools:** Gemini 3.6 Flash (researcher, copywriter), Gemini 3.5 Flash-Lite (planner, matcher, critics), Crustdata, Node, TypeScript, SQLite.
+
+**Ran live today:** both routes end to end to checked drafts, and a kill and resume with no paid call repeated. One menthol run cost 12.5 Crustdata credits and $0.026 of model spend.
+
+**Not live:** HubSpot sync is tested on a simulator. Gmail outreach and alerts are built and tested offline, limited to team test inboxes, and no email was sent to any buyer. Vendor customs APIs are an interface only. Buyer intelligence is Feature 2.
+
+**Where it needs a person:** selecting companies, importer names that don't resolve (often 2 to 5 of every 5 in our menthol runs), blocked drafts, every approval, and any action with an unknown outcome.
+
+**Approaches considered:** rules only (our morning build: it ranked steel distributors as grating buyers), one prompt (no proof), free-running agents (no bound on cost or actions), and the chosen hybrid of agents inside a durable, capped workflow.
+
+**Diagram and full write-up:** https://github.com/shivanshpilani/tradescout/blob/pivot/agentic-buyer-desk/README.md
 
 **Anything written before 10:15 AM?**
-A design pack written before the start: a pitch, the five-step flow, the trust-tier and fit rules, a Mermaid diagram sketch and a 7-hour plan. No code, prompts or data. It is not in the repository; the commit history starts at 11:28 IST.
+A design pack (pitch, flow, trust rules, a diagram sketch and a plan). Meridian's service business, case study, sales playbooks, customs export files and internal tools also predate the event. The export files are used as input data and are not in the repository. The internal tools are a separate codebase and are not in the repository. The commit history starts at 11:28 IST.
 
 **Per member:** name as registered, BITS email used for credits, YC registration email if different, BITS ID, personal email, GitHub username.
