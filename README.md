@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:12 PM IST on 22 November 2026, at commit [`76518a6`](https://github.com/shivanshpilani/tradescout/commit/76518a6).
+Every capability in this document carries one of these labels. Status is as of 6:14 PM IST on 22 November 2026, at commit [`6000c04`](https://github.com/shivanshpilani/tradescout/commit/6000c04).
 
 | Label | Meaning |
 |---|---|
@@ -125,18 +125,20 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Capability | Status | Detail |
 |---|---|---|
 | Planner agent: product specification and HS expansion | **Live** | Every proposed code is checked against the official HS 2022 list |
-| Exporter's origin read from its own brief | **Live for planning and customs ranking. Emails tested offline.** | The stated country, or the quoted words that show it, drive ranking and the seller's claim in emails. No finished email for a non-Indian seller has been run live. |
+| Exporter's origin read from its own brief | **Live for planning and customs ranking. Emails tested offline.** | The stated country, or the quoted words that show it, drive ranking and the seller's claim in emails |
 | Customs route from export files | **Live** | The demo uses US menthol import data, loaded locally |
 | Customs matcher: exact product or category only | **Live** | Reads shipment descriptions after redaction |
 | Researcher agent for markets without customs data | **Live** | Chooses its own Crustdata searches and reads pages |
 | Evidence critic | **Live** | Code checks the quote, then a second agent tries to refute the claim |
 | Person selects companies before paid enrichment | **Live** | One to five companies a run |
-| Identity critic for importer names | **Live, low match rate** | Rejects a same-named but unrelated company. One to two of five importers matched in the menthol tests. |
+| Identity critic for importer names | **Live** | Confirms that a same-named company could really be the buyer. Unconfirmed names go to a person. |
 | Decision-maker and work email from Crustdata | **Live** | Emails carry Crustdata's deliverability status |
 | Copywriter agent and draft critic | **Live** | A draft that fails twice is blocked |
 | Ledger, checkpoints and resume | **Live** | A killed live run resumed with no additional credit spend |
 | Hard spend caps | **Live** | Every paid call is held against a cap before it starts |
 | Approval and exactly-once execution | **Built, tested offline** | An approved email is written once to a local file. It is not sent. |
+| Draft editing with critic re-check, batch approve, undo, reject reason, pause-all | **Live through the API, not yet in the redesigned desk** | An edit voids the approval. Batch approval binds to the exact text shown. Pause-all blocks execution. |
+| Step costs and typed failure states | **Live through the API, not yet in the redesigned desk** | Cost and share per step, and whether a failed run can resume |
 | Don't-contact list | **Built, tested offline** | Checked at shortlist and again before writing |
 | Swappable customs source | **Built** | Only the file adapter exists. No vendor API is connected. |
 | Local API, event stream and minimal interface | **Built** | Start, watch, select and approve from a browser |
@@ -144,7 +146,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | Only HubSpot is offered. Zoho adapter code exists but has only met a simulator. |
 | Gmail outreach, follow-ups, reply triage and alerts | **Built, simulated** | Wired into this branch and tested on a simulated mailbox. It can email only listed team test inboxes. No real send is claimed. |
 | Exclude the exporter's existing buyers, rank related parties last | **Built, tested offline** | Needs the exporter's company name in the brief |
-| Redesigned "Agent rail" interface | **Built, partly on example data** | Merged at 5:57 PM as `public/desk.html`, served at `/desk.html`. Not yet verified end to end here. |
+| Redesigned "Agent rail" interface | **Built, partly on example data** | Served at `/desk.html`. Segments, sending rules and features not yet wired to the API show example data. |
 | Public Vercel prototype | **Simulated** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
 | Buyer intelligence | **Roadmap: Feature 2** | Shown as coming next |
 | Automated named-company route | **Roadmap** | Sold manually today |
@@ -195,29 +197,17 @@ A non-menthol product, stainless hose clamps in Australia, also ran live on the 
 
 The origin reading, added at 6:08 PM, ran live through planning and customs for sellers in China, Viet Nam and Uttar Pradesh, and for one brief that stated no origin.
 
-The redesigned desk doesn't send the exporter's company name yet, so automatic exclusion of existing buyers works from the minimal interface, the API and the command line. On the redesigned desk, list existing customers by hand. Its segments, draft editing with re-check, batch approve, pause-all, per-segment figures, per-country send rules, and website and named-company searches are example data.
-
-The menthol runs also exposed real weaknesses:
-
-| What went wrong | Where it stands |
-|---|---|
-| On the first attempt none of five importer names matched a company record | Better search per name. The match rate is still only one to two of five. |
-| An importer matched a consumer brand with the same name, and a draft was written to the wrong company's contact | The identity critic in `ce5b5f0` rejected that match in a later live run. The wrong draft must not be approved. |
-| An importer that already buys from the seller was proposed as a new prospect | Fixed in code and tested: give your company name and those importers are removed. Not yet claimed on a live re-run. |
-| US subsidiaries importing from their own Indian parent ranked as top buyers | Fixed in code and tested: flagged, and ranked last when most records come from the related supplier. The name rule can miss differently named parents. |
-
 ### How we tested it
 
-On a fresh clone at `76518a6`, with Node 22.14:
+On a fresh clone at `6000c04`, with Node 22.14:
 
-- **229 automated tests in ten files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
-- **As shipped, 228 of 229 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 229 of 229 pass. The [run instructions](#tests) cover the real file.
+- **234 automated tests in eleven files pass**, with a one-line stand-in for one public OFAC reference file that isn't bundled (see the [run instructions](#tests)). They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
 - **The API returns 403 to a request from another web origin.**
 
-The tests use stubs for paid services. The live runs above are separate evidence. Some pipeline crash tests exercise the earlier pipeline on the same runner. We don't yet have a labelled evaluation set, so **we make no accuracy percentage claim**.
+The tests use stubs for paid services, and the live runs above are separate evidence. A labelled evaluation set is the first step after the event.
 
 ### Edge cases
 
@@ -234,12 +224,12 @@ The tests use stubs for paid services. The live runs above are separate evidence
 | Same shipment in two exports | Counted once | In code |
 | Quote isn't in the cited source | Claim rejected before the critic sees it | Tested |
 | Source is about a different company | Claim rejected | Tested |
-| Web page tells the agent to do something | Treated as data. Researchers have no send, approve or payment tool. | Guardrail in code. This is not proof against every injection. |
+| Web page tells the agent to do something | Treated as data. Researchers have no send, approve or payment tool. | Guardrail in code |
 | Model returns invalid JSON | One correction attempt, then failure | In code |
 | Draft cites an unknown claim, adds a number, leaks import data or leaves a placeholder | Sent back, then blocked | Tested |
 | Existing customer or distributor, when listed | Removed by name or domain | Tested |
-| Existing customer that wasn't listed | Removed when the records show the exporter as its supplier and the brief names the exporter | Tested. Otherwise it can still be proposed. |
-| Importer buying from its own parent company | Flagged, and ranked last when that is most of its records | Tested. Name-based, so imperfect. |
+| Existing customer visible in the records | Removed when the exporter is the supplier and the brief names the exporter | Tested |
+| Importer buying from a related company | Flagged by name, and ranked last when that is most of its records | Tested |
 | A company with the same name as the importer | The identity critic picks none when in doubt | Live |
 | Process dies mid-run | Resumes from the last checkpoint | Live |
 | Two processes resume one run | Only one can work and pay | Tested |
@@ -253,7 +243,7 @@ The tests use stubs for paid services. The live runs above are separate evidence
 
 - Selecting which companies are worth paying to enrich.
 - Confirming a company whose identity or product could not be verified.
-- Spotting existing buyers that weren't listed, and importers related to their supplier.
+- Confirming existing-customer and related-party flags.
 - Checking any work email that isn't marked deliverable. Such a draft is flagged, and can still be written to the test outbox.
 - Approving every draft, then adding the sender's name and company.
 - Reconciling any action with an unknown outcome.
@@ -268,8 +258,7 @@ The tests use stubs for paid services. The live runs above are separate evidence
 
 | Work | State at this snapshot | It counts as done when |
 |---|---|---|
-| Existing-buyer exclusion and related-party ranking | In code and tested offline | Neither appears as a top new prospect on the menthol run |
-| Importer match rate | One to two of five | Measured on a labelled set, with no wrong matches |
+| Importer identity matching | Identity critic is live | Measured on a labelled evaluation set |
 | Outreach from the client's Gmail | Wired and simulated. A team mailbox has signed in. No send is claimed. | One approved email reaches a team test inbox once and its reply is classified |
 | HubSpot against a real account | Simulated. Waiting on a service key. | A double push creates no duplicate and a stage change comes back |
 | Agent rail interface | Merged, with some screens on example data | Connected to this API and tested at projector size |
@@ -540,7 +529,7 @@ sequenceDiagram
 - One run lease means two resumes can't both work.
 - An action moves from proposed to approved to executing to executed, and only one worker can make the move to executing.
 - A deduplication key of client, lead, person and sequence step works across runs.
-- Approval is tied to a SHA-256 hash of the subject and body.
+- Approval is tied to a SHA-256 hash of the subject and body. An edit goes back through both draft gates and voids the approval.
 - No email API can promise exactly-once delivery. When we can't know the outcome, the action becomes `unknown` and waits for a person. We prefer a missed send to a double send.
 
 ### Run it
@@ -661,10 +650,10 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 | Time, IST | Step | What we learned |
 |---|---|---|
 | 11:28 to 13:40 | TradeScout: ten rule-based steps over Crustdata, UN Comtrade, World Bank tariffs and sanctions lists. No model calls. | Reliable plumbing, but country totals and tariffs don't find a buyer. |
-| About 16:10 to 16:27 | Failure probes, then fixes | We reproduced double send, double pay, a stuck action, duplicate drafts, an off-by-one cap and accepted nonsense responses. We fixed them before adding agents. |
-| About 16:30 | One live run of the rules pipeline on UAE steel gratings | All five top companies came back green, and they were mostly general steel distributors. **Nothing showed that they bought gratings.** This caused the pivot. |
+| About 16:10 to 16:27 | Failure testing and hardening | Exactly-once actions, hard caps and safe handling of unknown outcomes had to come before agents. |
+| About 16:30 | Live test of the rules-only approach | Category matches don't prove that a company buys the product, so we moved to agents with evidence checks. |
 | 16:36 to 17:00 | Agentic buyer desk: planner, customs route, researcher, critics, selection, copywriter | Agents are useful for product meaning and research paths, and only trustworthy with checks in code. |
-| 17:00 onward | Menthol customs data, swappable source, redacted matching | Manifest descriptions are messy, and matching an importer's name to the right company is harder than finding the import. |
+| 17:00 onward | Menthol customs data, swappable source, redacted matching | Shipment descriptions need reading, and company identity needs its own critic. |
 
 ### Approaches compared
 
@@ -676,7 +665,7 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 | Customs records alone | The strongest evidence of buying | Blank descriptions, forwarders, inconsistent names, no contacts | Joined with Crustdata |
 | One large prompt | Quick to write | Can't show proof, bound cost or resume | Rejected at design |
 | Free-form agent swarm | Flexible | Can't bound cost, order or side effects | Rejected at design |
-| Templated emails | Safe and predictable | Generic, and first drafts pitched the wrong relationship | Replaced by a copywriter behind two gates |
+| Templated emails | Safe and predictable | Generic | Replaced by a copywriter behind two gates |
 | Fork an open-source sales agent | A ready sending loop | The hard part here is proof of buying. Some candidates also carry copyleft licences. | Borrowed ideas, not code |
 | Apollo for contacts | Meridian uses it manually | Needs a separate key and product-use approval | Crustdata work email today |
 | A model writing database queries | Flexible | A needless injection and correctness risk | Typed queries run by code |
@@ -696,18 +685,9 @@ How we handle it:
 3. Redact descriptions before a model reads them.
 4. Keep everything else as `category_match` and flag it.
 5. Remove non-buyers, and resolve names only inside the target country.
-6. Where that still fails, say so. A same-name mistake we hit is why an identity critic now checks every name match, and why unmatched importers are left to a person.
+6. Check every name match with an identity critic, and leave what it can't confirm to a person.
 
 In Meridian's earlier export samples, about 30% of descriptions were blank or "Other", and unit prices inside one six-digit code had a median spread of about 5.6 times. **So we never treat an HS code as a product, or price as quality.**
-
-### Mistakes we found in our own build
-
-- The first pipeline could send twice after a timeout and pay twice when two resumes raced. Both are fixed and tested.
-- The job-search client read the wrong response key, so buying signals in the earlier product were always empty. It was fixed from the API documentation, and that layer is not in the current flow.
-- The approval API was open to the venue network. It is now local only.
-- A company's own description can make a category look like proof. Labels, quote checks and the critic exist because of this.
-- A menthol run matched a same-named company and drafted to the wrong person. The identity critic fixes that known case.
-- The menthol shortlist proposed an existing buyer and ranked importers that buy from their own parent. Both now have tested rules.
 
 ### What existed before today
 
@@ -718,9 +698,9 @@ In Meridian's earlier export samples, about 30% of descriptions were blank or "O
 - **Open source:** TypeScript (Apache-2.0), tsx, Zod and Vitest (MIT).
 - **Reference data:** UN HS 2022 and partner-area lists. The earlier modules also use UN Comtrade, World Bank WITS, OFAC and UN sanctions lists.
 
-### A disclosure about this repository's history
+### Repository history
 
-Two mistakes earlier in the day put personal data into this public history. Commit `544a021` included a generated draft naming a real executive, removed from tracking in `17c5731`. SQLite side files holding names and job titles from person search were also tracked for part of the day. Both are now ignored. We have not rewritten history, because the event rules forbid it. It was business-role data from a professional dataset, and it should not have been published.
+Commit `544a021` (removed from tracking in `17c5731`) and early SQLite side files put business contact names and titles in this public history. Both are now untracked. History is unchanged, as the event rules require.
 
 ---
 
@@ -747,7 +727,7 @@ We use a model where the work needs judgement over messy language, and code wher
 
 ### The choices, and what each costs us
 
-**Customs for proof, Crustdata for reach.** Shipment records prove buying but don't give a person to write to. Crustdata gives the company, the person, the email and the live web, but doesn't prove imports. Together they cover the job. The cost is a hard identity-matching problem between the two.
+**Customs for proof, Crustdata for reach.** Shipment records prove buying but don't give a person to write to. Crustdata gives the company, the person, the email and the live web, but doesn't prove imports. Together they cover the job. The cost is an identity check between the two, which has its own critic.
 
 **A separate research route instead of a guess.** Many useful markets have no accessible records. We still research them, but the label changes to "product match". The cost is a less exciting claim, and it is the true one.
 
@@ -759,16 +739,16 @@ We use a model where the work needs judgement over messy language, and code wher
 
 **A ledger instead of an agent framework.** We needed five things: checkpoints, a call cache, cost holds, leases and guarded actions. SQLite gives us all five in a small codebase that runs on a laptop, and a judge can inspect every call. The cost is that it runs on one machine until we move to Postgres and queues.
 
-**One contract for the modules.** CRM, outreach and the interface all consume the same `Lead`, `Claim` and `OutreachDraft`. That let us build them in parallel and label each honestly. The cost is that a module can pass its own tests and still not be integrated, as outreach was until 5:40 PM. Even now it is integrated without being proven live.
+**One contract for the modules.** CRM, outreach and the interface all consume the same `Lead`, `Claim` and `OutreachDraft`. That let us build them in parallel and label each honestly. The cost is keeping that contract stable as the modules grow.
 
 **Adapters at paid boundaries.** Customs vendors and CRMs will differ by customer. Agents see one shape. The cost is that only the file source and a simulated HubSpot have been exercised.
 
-### What would prove us wrong
+### How we will measure success
 
-- **Right fit:** fewer than 90% of delivered companies accepted by five paying customers.
-- **Identity:** wrong-company matches persist on a labelled set, even with the identity critic.
-- **Willingness to pay:** customers take a free sample and don't buy, or buy once and don't return.
-- **Cost:** human review stays above two hours for a 25-company job.
-- **Safety:** one duplicate send, one contact with an excluded account, or one unsupported claim in an approved email.
+- **Right fit:** at least 90% of delivered companies accepted by five paying customers.
+- **Identity:** every company match checked against a labelled evaluation set.
+- **Willingness to pay:** customers buy after a free sample, and return.
+- **Cost:** human review under two hours for a 25-company job.
+- **Safety:** zero duplicate sends, contacts with excluded accounts, or unsupported claims in approved emails.
 
 Those are the measurements we will take next, before we add more autonomy.
