@@ -127,6 +127,20 @@ describe("robustness", () => {
     expect(sent).toBe(1);
   });
 
+  it("retries only a request that was never sent", async () => {
+    let n = 0;
+    vi.stubGlobal("fetch", async () => {
+      if (++n === 1) throw Object.assign(new TypeError("fetch failed"), { cause: { code: "UND_ERR_CONNECT_TIMEOUT" } });
+      return new Response('{"companies":[]}', { status: 200 });
+    });
+    await new Crustdata("offline-test").companySearch({ fields: ["x"] });
+    expect(n).toBe(2);
+    n = 0;
+    vi.stubGlobal("fetch", async () => { n++; throw new Error("timeout after the request was sent"); });
+    await expect(new Crustdata("offline-test").companySearch({ fields: ["x"] })).rejects.toThrow();
+    expect(n).toBe(1);
+  });
+
   it("rejects a nonsense 200", async () => {
     vi.stubGlobal("fetch", async () => new Response('{"oops":"nonsense"}', { status: 200 }));
     await expect(new Crustdata("offline-test").companySearch({ fields: ["x"] })).rejects.toThrow(/without a companies list/);

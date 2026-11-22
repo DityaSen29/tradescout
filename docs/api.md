@@ -10,12 +10,12 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 
 | Call | Body | Returns |
 |---|---|---|
-| `POST /api/runs` | `{product, target_country, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
+| `POST /api/runs` | `{product, target_country, client_name?, hs_code?, notes?, do_not_contact?: string[], min_headcount?, max_headcount?, client_id?}` | `{run_id}` |
 | `GET /api/runs/:id/events` | | SSE, below |
 | `GET /api/runs/:id` | | `{run, running, steps, totals, plan, trace, shortlist: Lead[], max_selected, actions, report}` |
 | `POST /api/runs/:id/select` | `{lead_ids: string[]}`, 1 to 5 | resumes the run: contacts, emails, drafts |
 | `POST /api/actions/:id/approve`, `/reject` | | the action |
-| `POST /api/actions/:id/execute` | | writes to the test outbox once, `{ran}` |
+| `POST /api/actions/:id/execute` | | once: writes to the test outbox, or emails a listed team inbox when `OUTREACH_TEST_RECIPIENTS` is set. `{ran, reason?}` |
 | `POST /api/runs/:id/sync` | | queues and pushes the selected leads to the CRM |
 | `POST /api/runs/:id/resume`, `/retry` | retry: `{from}` | continues from checkpoints |
 | `GET /api/runs/:id/ledger`, `/evidence` | | every call and cost, every claim |
@@ -23,6 +23,7 @@ Needs `CRUSTDATA_API_KEY` and `GEMINI_API_KEY` in `.env`. Export files are optio
 | `GET /api/modules` | | modules with status, pipeline stages, outreach mode |
 | `GET /api/limits` | | today's spend against the caps |
 | `/api/crm/*` | | see `src/crm/README.md` |
+| `/api/outreach/*` | | see `docs/outreach.md` |
 
 `run.status`: `running`, `awaiting_person` (show the selection), `done`, `failed`, `budget_exceeded`.
 

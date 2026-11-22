@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Ledger } from "../src/ledger/ledger.js";
 import { runPipeline } from "../src/runner/pipeline.js";
 import { checkDraft, draftHash } from "../src/buyer/write.js";
-import { behaviourOf, isBlank, isBuyerName, runQueries, type Row } from "../src/buyer/customs.js";
+import { behaviourOf, isBlank, isClient, isRelatedParty, isBuyerName, redactDescription, runQueries, type Row } from "../src/buyer/customs.js";
 import { quoteInSource, sourceAboutCompany } from "../src/buyer/common.js";
-import { nameMatch } from "../src/buyer/contacts.js";
+import { nameMatch, searchName } from "../src/buyer/contacts.js";
 import { onDoNotContact, selectStep } from "../src/buyer/select.js";
 import { pageText } from "../src/buyer/research.js";
 
@@ -45,6 +45,19 @@ describe("customs route", () => {
     expect(["OTHER", "NULL", null].every(isBlank)).toBe(true);
     expect(["TO ORDER", "Example Freight Forwarders"].some(isBuyerName)).toBe(false);
   });
+  it("redacts parties, contacts and references before a model reads a description", () => {
+    const d = redactDescription(row({ importer: "Example Importer", description: "NATURAL MENTHOL CRYSTALS 25 KG PO 4500123456 EXAMPLE IMPORTER a.b@example.com" }));
+    expect(d).toBe("NATURAL MENTHOL CRYSTALS 25 KG PO");
+  });
+  it("recognises the client's own buyers", () => {
+    expect(isClient("A.B. MINT PRODUCTS PVT LTD", "A B Mint Products")).toBe(true);
+    expect(isClient("OTHER MINT PRODUCTS", "A B Mint Products")).toBe(false);
+  });
+  it("recognises an importer buying from its own parent", () => {
+    expect(isRelatedParty("EXAMPLON LLC", "EXAMPLON PVT LTD")).toBe(true);
+    expect(isRelatedParty("ZED AROMATICS LLC", "ZED AROMATICS LTD")).toBe(true);
+    expect(isRelatedParty("NATURAL FOODS INC", "NATURAL MENTHOL WORKS")).toBe(false);
+  });
   it("runs a typed query", () => {
     const q = [{ hs_prefix: "730890", destination_iso3: "USA", include_terms: [], exclude_terms: [], group_by: "importer" as const, measures: [] }];
     expect(runQueries([row({}), row({ hs: "841391" }), row({ destination: "EQUADOR" })], q)).toMatchObject({ inMarket: 2, hits: [{ hs: "730890" }] });
@@ -55,6 +68,10 @@ describe("people gates", () => {
   it("matches a record name inside its market only on distinctive words", () => {
     expect(nameMatch("Examplecar Ecuador", "EXAMPLECAR CIA LTDA", "Ecuador")).toBe(1);
     expect(nameMatch("Austral Motors", "Pacific Motors")).toBeLessThan(0.8);
+  });
+  it("searches a record name as an exact phrase", () => {
+    expect(["EXAMPLON FLAVOURS AND FRAGRANCES LLC", "ACME INC", "AMERICAN WIDGET CO", "EXAMPLE AROMATICS INC"].map(searchName)).toEqual(["examplon", "acme", "american widget", "example aromatics"]);
+    expect(nameMatch("Examplon Flavors & Fragrances", "EXAMPLON FLAVOURS AND FRAGRANCES LLC")).toBe(1);
   });
   it("honours the don't-contact list", () => expect(onDoNotContact({ name: "Acme Steel LLC", domain: "acme.example" }, ["https://www.acme.example/"])).toBe(true));
   it("pauses for a selection, then continues without repeating work", async () => {

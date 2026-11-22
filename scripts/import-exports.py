@@ -61,6 +61,9 @@ def number(v):
 
 
 def month(v):
+    iso = re.match(r"(\d{4})-(\d{2})-\d{2}", (v or "").strip())
+    if iso:
+        return "%s-%s" % iso.groups()
     m = re.match(r"([A-Za-z]{3})[a-z]*[ -](\d{4})$", (v or "").strip())
     if m and m.group(1).lower() in MONTHS:
         return "%s-%02d" % (m.group(2), MONTHS[m.group(1).lower()])
@@ -83,14 +86,20 @@ def main(args):
                 d = dict(zip(head, r))
                 pick = lambda *ks: next((text(d[k]) for k in ks if text(d.get(k))), None)
                 importer = pick("CONSIGNEE_NAME_EN", "CONSIGNEE_NAME", "IMPORTER_NAME")
-                dest, hs = pick("DESTINATION_COUNTRY"), re.sub(r"\D", "", d.get("HS_CODE", ""))
+                # a US import manifest has a bill of lading and no destination column: one bill is one record
+                bill = pick("BILL_OF_LADING") if "US_CLEARING_DISTRICT" in head else None
+                if bill:
+                    if bill in seen:
+                        continue
+                    seen.add(bill)
+                dest, hs = ("USA" if bill else pick("DESTINATION_COUNTRY")), re.sub(r"\D", "", d.get("HS_CODE", ""))
                 if not importer or not dest or len(hs) < 4 or (exclude and hs.startswith(exclude)):
                     continue
                 rec = dict(importer=importer, supplier=pick("SHIPPER_NAME_EN", "SHIPPER_NAME", "SUPPLIER_NAME"), hs=hs,
-                           description=pick("HS_CODE_DESCRIPTION"), origin=pick("ORIGIN_COUNTRY"), destination=dest,
-                           value_usd=number(pick("TOTALVALUEUSD", "TOTALUSD")), quantity=number(pick("TOTALQUANTITY", "SUMOFQUANTITY")),
-                           weight_kg=number(pick("NET_WEIGHT")), month=month(d.get("MONTHYEAR")))
-                key = hashlib.sha1(json.dumps(rec, sort_keys=True).encode()).hexdigest()
+                           description=pick("PRODUCT_DESCRIPTION", "HS_CODE_DESCRIPTION")[:300] if pick("PRODUCT_DESCRIPTION", "HS_CODE_DESCRIPTION") else None, origin=pick("ORIGIN_COUNTRY", "COUNTRY"), destination=dest,
+                           value_usd=number(pick("TOTALVALUEUSD", "TOTALUSD")), quantity=number(pick("TOTALQUANTITY", "SUMOFQUANTITY", "QUANTITY")),
+                           weight_kg=number(pick("NET_WEIGHT", "WEIGHT_IN_KG")), month=month(pick("MONTHYEAR", "ACTUAL_ARRIVAL_DATE")))
+                key = bill and "bill:" + bill or hashlib.sha1(json.dumps(rec, sort_keys=True).encode()).hexdigest()
                 if key in seen:  # the same record in two overlapping exports
                     continue
                 seen.add(key)

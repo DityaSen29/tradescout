@@ -1,6 +1,7 @@
 import { Ledger, hashOf, now } from "../ledger/ledger.js";
 import type { Evidence, TradeRequest } from "../core/types.js";
 import { BudgetExceeded, NeedsPerson } from "../core/types.js";
+import { neverSent } from "../core/net.js";
 import { paidProvider } from "../core/limits.js";
 
 /**
@@ -126,7 +127,7 @@ function makeCtx(ledger: Ledger, runId: string, request: TradeRequest, outputs: 
         return { data, cached: false, retrieved_at, latency_ms, credits };
       } catch (err: any) {
         // only a client-error rejection is known to be free; timeouts, 5xx and bad bodies keep their hold
-        if (hold && err?.status >= 400 && err.status < 500 && err.status !== 408) ledger.settleSpend(hold, 0);
+        if (hold && (neverSent(err) || (err?.status >= 400 && err.status < 500 && err.status !== 408))) ledger.settleSpend(hold, 0);
         ledger.recordCall({ run_id: runId, step, source: meta.source, endpoint: meta.endpoint, request_hash: requestHash, status: "error", credits: 0, model_cost_usd: 0, latency_ms: Date.now() - t0, response_json: null, note: String(err?.message ?? err) });
         throw err;
       }

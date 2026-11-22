@@ -3,6 +3,7 @@
  * Every response's x-credits-used header is returned so the ledger can record the exact charge.
  * 429 → wait x-ratelimit-reset (or backoff) and retry; 402/403 → clear errors, no retry.
  */
+import { fetchOnce } from "../core/net.js";
 export const CRUSTDATA_BASE = "https://api.crustdata.com";
 export const CRUSTDATA_VERSION = "2025-11-01";
 
@@ -23,10 +24,10 @@ export class Crustdata {
   }
   async request<T = any>(method: "GET" | "POST", path: string, body?: unknown): Promise<CrustResponse<T>> {
     for (let attempt = 0; attempt < this.maxTries; attempt++) {
-      const res = await fetch(CRUSTDATA_BASE + path, {
+      const res = await fetchOnce(CRUSTDATA_BASE + path, () => ({
         method, headers: { authorization: `Bearer ${this.key}`, "x-api-version": CRUSTDATA_VERSION, "content-type": "application/json" },
         body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(60_000),
-      });
+      }));
       if (res.status === 429) {
         const wait = Number(res.headers.get("x-ratelimit-reset") ?? res.headers.get("retry-after") ?? 2 ** attempt);
         await new Promise(r => setTimeout(r, Math.min(30, wait) * 1000 + Math.random() * 800));

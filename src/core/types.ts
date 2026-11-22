@@ -10,6 +10,7 @@ export const RequestSchema = z.object({
   hs_code: z.string().regex(/^\d{4,8}$/).optional(),      // the person's pick when the product was ambiguous
   notes: z.string().max(1000).optional(),     // the seller's own offer facts, quotable in outreach
   client_id: z.string().max(80).optional(),
+  client_name: z.string().min(4).max(120).optional(),     // the exporter itself: importers it already supplies are never prospects
   do_not_contact: z.array(z.string().max(200)).max(500).optional(),   // existing customers, agents, distributors
 });
 export type TradeRequest = z.infer<typeof RequestSchema>;

@@ -34,7 +34,7 @@ export async function shortlistStep(ctx: StepCtx): Promise<{ leads: Lead[]; trac
   const blocked = ctx.request.do_not_contact ?? [];
   const kept = [...byId.values()].filter(l => !onDoNotContact(l.company, blocked));
   if (kept.length < byId.size) say("policy", `${byId.size - kept.length} company(ies) removed: on your don't-contact list`);
-  const leads = kept.sort((a, b) => ORDER[a.match] - ORDER[b.match] || b.fit_score - a.fit_score).slice(0, 25);
+  const leads = kept.sort((a, b) => Number(!!a.related_party) - Number(!!b.related_party) || ORDER[a.match] - ORDER[b.match] || b.fit_score - a.fit_score).slice(0, 25);
   if (!leads.length) throw new Error("cannot verify request: neither the export files nor research produced a company with a record");
   say("orchestrator", `Shortlist ready: ${leads.length} companies. Paid enrichment waits for your selection.`);
   return { leads, trace };

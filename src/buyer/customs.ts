@@ -9,6 +9,7 @@ import { hashOf } from "../ledger/ledger.js";
 import { newLead, tracer, type Trace } from "./common.js";
 import type { BuyingBehaviour, Lead } from "./contract.js";
 import type { Plan, CustomsQuery } from "./plan.js";
+import { customsSource } from "./customs-source.js";
 
 /** One line of an export file, as written by scripts/import-exports.py. */
 export interface Row {
@@ -64,15 +65,48 @@ export function behaviourOf(rows: Row[]): BuyingBehaviour {
   };
 }
 
+const flatName = (s: string) => s.toLowerCase().replace(/&/g, "and").replace(/\b(pvt|private|ltd|limited|inc|llc|co|company|corp|corporation|exports?)\b/g, "").replace(/[^a-z0-9]/g, "");
+/** Is this supplier the client itself? Spacing and dots vary between manifests: "A B MINT", "A.B. Mint". */
+export function isClient(supplier: string | null, client: string | undefined): boolean {
+  if (!supplier || !client) return false;
+  const s = flatName(supplier), c = flatName(client);
+  return c.length >= 5 && s.length >= 5 && (s.startsWith(c) || c.startsWith(s));
+}
+const SHARED_WORDS = new Set("american national international global united universal general natural pacific premier royal north south east west eastern western central golden star shanghai china india indian menthol mint aroma aromatics aromatic chemical chemicals pharma steel trading industries the".split(" "));
+/** A US arm buying from its Indian parent is not an open buyer. Judged on the distinctive start of both names. */
+export function isRelatedParty(importer: string, supplier: string | null): boolean {
+  if (!supplier) return false;
+  const a = cleanName(importer).split(" "), b = cleanName(supplier).split(" ");
+  if (!a[0] || a[0] !== b[0]) return false;
+  return (a[0].length >= 4 && !SHARED_WORDS.has(a[0])) || (!!a[1] && a[1] === b[1]);
+}
+
 export interface CustomsOutput {
   coverage: "records" | "none"; rows_in_market: number; rows_matched: number; leads: Lead[]; needs_research: boolean; trace: Trace[];
 }
+/**
+ * Manifest descriptions carry party names, contacts and reference numbers. The model gets none of them:
+ * the row's own party names, emails, links and any number of four or more digits are removed first.
+ */
+export function redactDescription(r: Pick<Row, "description" | "importer" | "supplier">): string {
+  let s = (r.description ?? "").toUpperCase().replace(/\S+@\S+|HTTPS?:\S+|WWW\.\S+/g, " ");
+  for (const party of [r.importer, r.supplier]) {
+    if (!party) continue;
+    const name = party.toUpperCase().trim();
+    if (name.length >= 4) s = s.split(name).join(" ");
+    const head = cleanName(party).toUpperCase().split(" ").slice(0, 2).join(" ");
+    if (head.length >= 7 && !/^(MENTHOL|NATURAL|STEEL|CHEMICAL)/.test(head)) s = s.split(head).join(" ");
+  }
+  return s.replace(/\b[A-Z-]*\d[\d./-]{3,}[A-Z0-9-]*\b/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+}
+const DESC_BATCH = 120, DESC_MAX = 840;
 const DescSchema = z.object({ matches: z.array(z.number().int()), reasoning: z.string() });
 
 export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
   const { trace, say } = tracer(ctx);
   const plan = ctx.outputs.plan as Plan;
-  const r = await ctx.call({ source: "customs", endpoint: "export-files", request: { queries: plan.customs_queries } }, async () => runQueries(loadRows(), plan.customs_queries));
+  const source = customsSource();
+  const r = await ctx.call({ source: source.billedAs, endpoint: source.id, request: { source: source.id, queries: plan.customs_queries }, maxUnits: source.maxUnits, credits: (x) => x.units ?? null }, () => source.query(plan.customs_queries));
   const { inMarket, hits } = r.data;
   say("customs", `${plan.customs_queries.length} structured queries on the export files: ${hits.length} matching records of ${inMarket} for ${plan.country.name}`);
   if (!hits.length) {
@@ -80,14 +114,19 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     return { coverage: "none", rows_in_market: inMarket, rows_matched: 0, leads: [], needs_research: true, trace };
   }
   // the model sees only distinct product descriptions: no importer, supplier, value or quantity
-  const descs = [...new Set(hits.filter(h => !isBlank(h.description)).map(h => h.description!.trim()))].slice(0, 120);
+  const described = hits.filter(h => !isBlank(h.description)).map(h => ({ h, text: redactDescription(h) })).filter(x => x.text.length > 2);
+  const all = [...new Set(described.map(x => x.text))];
+  const descs = all.slice(0, DESC_MAX);
+  if (all.length > descs.length) say("customs", `${all.length - descs.length} descriptions were not read: over the ${DESC_MAX} limit, so those records stay category-only`);
   const exact = new Set<string>();
-  if (descs.length) {
-    const j = await askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 1500,
+  for (let at = 0; at < descs.length; at += DESC_BATCH) {
+    const batch = descs.slice(at, at + DESC_BATCH);
+    const j = await askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 3000,
       task: `You decide which shipment descriptions are this exact product. A description that only fits the broad HS heading is not a match. Return {"matches":[indexes of exact matches], "reasoning": one sentence}.`,
-      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: descs.map((text, index) => ({ index, text })) } });
-    for (const i of j.matches) if (descs[i] !== undefined) exact.add(descs[i]);
-    say("customs", `${exact.size} of ${descs.length} descriptions are the exact product: ${j.reasoning}`);
+      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: batch.map((text, index) => ({ index, text })) } });
+    let n = 0;
+    for (const i of new Set(j.matches)) if (batch[i] !== undefined) { exact.add(batch[i]); n++; }
+    say("customs", `${n} of descriptions ${at + 1} to ${at + batch.length} are the exact product: ${j.reasoning}`);
   }
   if (!descs.length) say("customs", "Every description in this export is blank or 'Other', so none can prove the exact product. The detailed product report is needed.");
   const groups = new Map<string, Row[]>();
@@ -97,8 +136,12 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     groups.set(key, [...(groups.get(key) ?? []), h]);
   }
   const leads: Lead[] = [];
+  const client = ctx.request.client_name;
+  if (!client) say("policy", "No client company name in the brief, so importers the client already supplies cannot be excluded.");
+  let own = 0, related = 0;
   for (const rows of groups.values()) {
-    const matched = rows.filter(x => x.description && exact.has(x.description.trim()));
+    if (rows.some(x => isClient(x.supplier, client)) || isClient(rows[0].importer, client)) { own++; continue; }
+    const matched = rows.filter(x => !isBlank(x.description) && exact.has(redactDescription(x)));
     const used = matched.length ? matched : rows;
     const b = behaviourOf(used);
     const score = Math.round((matched.length ? 45 : 20) + Math.min(20, 5 * Math.log2(1 + used.length)) + Math.min(20, b.months_active * 4)
@@ -107,16 +150,24 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
       match: matched.length ? "import_record" : "category_match", score,
       reason: matched.length ? `${matched.length} import record(s) whose description is this product` : "imports under the HS code; the description is blank or a different product" });
     lead.behaviour = b;
+    const kin = used.filter(x => isRelatedParty(x.importer, x.supplier));
+    if (kin.length) {
+      const share = kin.length / used.length;
+      lead.needs_person.push(`possible related party: ${Math.round(share * 100)}% of these records come from ${kin[0].supplier}, which shares its name`);
+      if (share >= 0.5) { lead.related_party = kin[0].supplier!; lead.fit_score = Math.max(5, lead.fit_score - 45); related++; }
+    }
     const first = used[0];
     const text = matched.length ? `Imported this product: ${used.length} record(s), ${b.first_month} to ${b.last_month}` : `Imported under HS ${lead.hs_codes.join(", ")}: ${used.length} record(s). The product is not confirmed`;
     lead.claims.push({ id: hashOf([lead.lead_id, "customs"]).slice(0, 10), lead_id: lead.lead_id, text, kind: "customs",
-      quote: first.description ?? `HS ${first.hs}`, source_url: null, record_id: `${first.file}:${first.line}`, retrieved_at: r.retrieved_at,
+      quote: first.description ? redactDescription(first) : `HS ${first.hs}`, source_url: null, record_id: `${first.file}:${first.line}`, retrieved_at: r.retrieved_at,
       verdict: "accepted", verdict_reason: "computed by code from the export records", shareable: false });
     if (!matched.length) lead.needs_person.push("product not identified in the record: request the detailed product report");
     leads.push(lead);
   }
-  leads.sort((a, b) => b.fit_score - a.fit_score);
-  const exactLeads = leads.filter(l => l.match === "import_record").length;
+  if (own) say("policy", `${own} importer(s) removed: the client already supplies them`);
+  if (related) say("policy", `${related} importer(s) buy mostly from their own parent or sister company: flagged and ranked last`);
+  leads.sort((a, b) => Number(!!a.related_party) - Number(!!b.related_party) || b.fit_score - a.fit_score);
+  const exactLeads = leads.filter(l => l.match === "import_record" && !l.related_party).length;
   say("customs", `${leads.length} importers: ${exactLeads} with this exact product, the rest category only`);
   return { coverage: "records", rows_in_market: inMarket, rows_matched: hits.length, leads: leads.slice(0, 25), needs_research: exactLeads < 3, trace };
 }

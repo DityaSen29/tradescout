@@ -59,6 +59,8 @@ export interface Lead {
   contact: { person_id: string; name: string; title: string; email: string | null; email_status: EmailStatus } | null;
   selected: boolean;
   needs_person: string[];
+  /** The importer's supplier that looks like its own parent or sister company. Ranked last. */
+  related_party?: string;
 }
 
 /** Payload of a ledger action of kind "email_draft". */
