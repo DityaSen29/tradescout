@@ -24,4 +24,4 @@ export const FAMILIES: Family[] = [
   { key: "fruit_veg", triggers: ["mango", "banana", "fruit", "vegetable", "onion", "grape", "produce"], hs_prefixes: ["08", "07", "0804", "0803", "0806", "0703"], expand: ["fresh produce importer", "fruit and vegetable wholesale", "fresh produce"], industries: ["Food & Beverages", "Farming", "Wholesale", "Import & Export"] },
   { key: "it_services", triggers: ["software", "it services", "saas"], hs_prefixes: [], expand: ["software reseller", "IT distributor", "value added reseller"], industries: ["Information Technology & Services", "IT Services and IT Consulting", "Computer Software", "Software Development"] },
 ];
-export const ROLE_TERMS = ["distributor", "wholesaler", "importer", "trading", "trader", "dealer", "stockist", "supplier", "agent"];
+export const ROLE_TERMS = ["distributor", "wholesaler", "importer", "trading", "trader", "dealer", "stockist", "reseller"];

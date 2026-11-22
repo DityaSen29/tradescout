@@ -34,10 +34,16 @@ export async function policyStep(ctx: StepCtx): Promise<LayerResult<PolicyData>>
     return { date: null, precision: null };
   };
   const sinceYear = year - 1;
+  const EU = new Set(["AUT","BEL","BGR","HRV","CYP","CZE","DNK","EST","FIN","FRA","DEU","GRC","HUN","IRL","ITA","LVA","LTU","LUX","MLT","NLD","POL","PRT","ROU","SVK","SVN","ESP","SWE"]);
+  const DEMONYM: Record<string, string[]> = { DEU: ["german", "germany"], ARE: ["uae", "emirati", "emirates", "dubai"], USA: ["us ", "u.s.", "united states", "american", "usa"], GBR: ["uk", "britain", "british", "united kingdom"], FRA: ["france", "french"], ITA: ["italy", "italian"], NLD: ["netherlands", "dutch"], JPN: ["japan", "japanese"], AUS: ["australia", "australian"], SAU: ["saudi"], CAN: ["canada", "canadian"], ESP: ["spain", "spanish"] };
+  const iso3: string = parse.country.iso3;
+  const marketWords = [String(country).toLowerCase(), ...(DEMONYM[iso3] ?? []), ...(EU.has(iso3) ? ["eu ", "eu-", "european union", "europe"] : [])];
+  const namesMarket = (text: string) => { const t = ` ${text.toLowerCase()} `; return marketWords.some(w => t.includes(w)); };
   const all = (r.data.results as any[]).map(it => { const d = dateOf(it); return { title: String(it.title ?? "").replace(/^\|\s*/, ""), url: unwrap(String(it.url ?? it.link ?? "")), date: d.date, precision: d.precision, snippet: String(it.snippet ?? it.description ?? it.content ?? "").slice(0, 300) }; })
     .filter(it => it.url)
-    .map(it => { const text = `${it.title} ${it.snippet}`; const kind = RED_RX.test(text) ? "restriction" : AMBER_RX.test(text) ? "policy change" : "mention"; return { title: it.title, url: it.url, date: it.date, precision: it.precision, kind }; })
-    .filter(it => it.kind !== "mention");
+    .map(it => { const text = `${it.title} ${it.snippet}`; const kind = RED_RX.test(text) ? "restriction" : AMBER_RX.test(text) ? "policy change" : "mention"; return { title: it.title, url: it.url, date: it.date, precision: it.precision, kind, snippet: it.snippet }; })
+    .filter(it => it.kind !== "mention")
+    .filter(it => namesMarket(`${it.title} ${it.snippet ?? ""}`));               // a policy item must name this market; India-Oman news does not set Germany's flag
   const recent = (it: { date: string | null; precision: string | null }) => it.date != null && (it.precision === "year" ? Number(it.date) >= sinceYear : Date.parse(it.date) >= since);
   const items = all.filter(recent).sort((a, b) => Number(b.url.includes("google.com")) - Number(a.url.includes("google.com")) ? 0 : 0).sort((a, b) => Number(a.url.includes("google.com/goto")) - Number(b.url.includes("google.com/goto"))).slice(0, 6);
   const undated = all.filter(it => !recent(it)).slice(0, 4);
@@ -49,7 +55,7 @@ export async function policyStep(ctx: StepCtx): Promise<LayerResult<PolicyData>>
     for (const u of undated) ctx.evidence("policy", { claim: `undated mention: ${u.title}`, source_type: "web", source_url: u.url, record_date: null, retrieved_at });
     return { layer: "policy", status: "cannot_verify", reason: `no dated policy news found in the last 12 months${undated.length ? `; ${undated.length} undated mentions need a person` : ""}; I cannot rule out a change`, data: { summary: `No dated policy news found in the last 12 months${undated.length ? `; ${undated.length} undated mentions need a person to check` : ""}. I cannot rule out a change; check the importer's customs authority before quoting.`, flag: "GREEN", items: [], undated: undated.map(u => ({ title: u.title, url: u.url, kind: u.kind })) }, evidence: [ev], credits: r.credits, latency_ms: r.latency_ms };
   }
-  const data: PolicyData = { summary: `${flag === "RED" ? "A restriction" : "A policy change"} is in the news: ${items[0].title} (${items[0].date}${items[0].precision === "year" ? ", year only" : ""})${undated.length ? `; ${undated.length} undated mentions need a person` : ""}.`, flag, items, undated: undated.map(u => ({ title: u.title, url: u.url, kind: u.kind })) };
+  const data: PolicyData = { summary: `${flag === "RED" ? "A restriction" : "A policy change"} naming ${country} is in the news: ${items[0].title} (${items[0].date}${items[0].precision === "year" ? ", year only" : ""})${undated.length ? `; ${undated.length} undated mentions need a person` : ""}.`, flag, items: items.map(({ snippet, ...rest }) => rest), undated: undated.map(u => ({ title: u.title, url: u.url, kind: u.kind })) };
   const evidence = items.map(i => ({ claim: `${i.kind}: ${i.title}${i.precision === "year" ? " (dated to the year only)" : ""}`, source_type: "web" as const, source_url: i.url, record_date: i.date, retrieved_at }));
   for (const u of undated) ctx.evidence("policy", { claim: `undated mention: ${u.title}`, source_type: "web", source_url: u.url, record_date: null, retrieved_at });
   for (const e of evidence) ctx.evidence("policy", e);

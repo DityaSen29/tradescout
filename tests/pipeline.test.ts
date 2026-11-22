@@ -5,7 +5,7 @@ import { buildPipeline } from "../src/pipeline.js";
 import { installStub } from "./fixtures/crustdata.js";
 
 process.env.CRUSTDATA_API_KEY = "test-key";
-const req = { product: "industrial textiles", target_country: "Germany", min_headcount: 20, max_headcount: 2000 };
+const req = { product: "industrial textiles", target_country: "Germany", min_headcount: 20, max_headcount: 2000, hs_code: "5911" };   // the person picked 5911 over 5906
 
 describe("end-to-end on stubbed Crustdata", () => {
   let stub: ReturnType<typeof installStub>;
@@ -82,6 +82,16 @@ describe("end-to-end on stubbed Crustdata", () => {
       expect(r.candidates.find((c: any) => c.name.includes("Nordfaser Technische")).trust_reasons.join(" ")).toMatch(/insufficient data/);
       expect(r.unresolved.join(" ")).toMatch(/enrich unavailable/);
     } finally { s2.restore(); stub = installStub(); }
+  });
+
+  it("stops and asks when the HS code is a near-tie, paying nothing", async () => {
+    const l = new Ledger(":memory:");
+    const { hs_code, ...ambiguous } = req;
+    const run = l.createRun(ambiguous);
+    const before = stub.calls["/company/search"] ?? 0;
+    await expect(runPipeline(l, run, buildPipeline())).rejects.toThrow(/needs input: .*5906.*5911|needs input: .*5911.*5906/);
+    expect((stub.calls["/company/search"] ?? 0) - before).toBe(0);
+    expect(l.totals(run).credits_used).toBe(0);
   });
 
   it("stops within the credit ceiling", async () => {

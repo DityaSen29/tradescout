@@ -33,9 +33,10 @@ describe("trust", () => {
     const t = scoreTrust({ headcount: null, growth_12m: null, year_founded: null, domain: null, sanctions: null, adverse_news: null, enriched: false });
     expect(t.tier).toBe("AMBER"); expect(t.fired).toContain("NO_ENRICHMENT");
   });
-  it("is RED on a headcount collapse or a sanctions match", () => {
+  it("is RED on a headcount collapse; a name-only sanctions match is AMBER for a person", () => {
     expect(scoreTrust({ headcount: 900, growth_12m: -35, year_founded: 1975, domain: "x.de", sanctions: { hit: false }, adverse_news: 0, enriched: true }).tier).toBe("RED");
-    expect(scoreTrust({ headcount: 50, growth_12m: 2, year_founded: 2000, domain: "x.de", sanctions: { hit: true, name: "X", list: "OFAC SDN", score: 95 }, adverse_news: 0, enriched: true }).tier).toBe("RED");
+    const nameOnly = scoreTrust({ headcount: 50, growth_12m: 2, year_founded: 2000, domain: "x.de", sanctions: { hit: true, name: "X", list: "OFAC SDN", score: 95 }, adverse_news: 0, enriched: true });
+    expect(nameOnly.tier).toBe("AMBER"); expect(nameOnly.reasons[0]).toMatch(/needs a person/);   // a name alone never convicts
   });
   it("is GREEN only when no rule fires", () => {
     expect(scoreTrust({ headcount: 140, growth_12m: 5, year_founded: 1998, domain: "nordfaser.de", sanctions: { hit: false }, adverse_news: 0, enriched: true }).tier).toBe("GREEN");

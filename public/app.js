@@ -60,6 +60,16 @@ function renderReport(d) {
   $("#resume-btn").hidden = d.running || !(d.run.status === "failed" || d.run.status === "running");
   $("#rerun-btn").hidden = d.run.status !== "done";
   renderSteps(d.steps);
+  const failed = (d.steps || []).find(s => s.status === "failed" && /needs input|cannot verify/.test(s.error || ""));
+  const ask = $("#ask");
+  if (failed) {
+    const msg = String(failed.error).split("\n")[0];
+    const codes = [...msg.matchAll(/\b(\d{4,6}) \(([^)]+)\)/g)].map(m => ({ code: m[1], text: m[2] }));
+    ask.hidden = false;
+    ask.innerHTML = `<h2>${/needs input/.test(msg) ? "The desk needs one answer before it spends anything" : "The desk cannot verify the request"}</h2><p>${esc(msg.replace(/^(needs input|cannot verify request): /, ""))}</p>` +
+      (codes.length ? `<div class="btns">${codes.map(c => `<button data-hs="${esc(c.code)}">Use HS ${esc(c.code)}: ${esc(c.text)}</button>`).join("")}</div>` : "");
+    ask.onclick = async (e) => { const hs = e.target.dataset.hs; if (!hs) return; e.target.disabled = true; const { run_id } = await api("/runs", { method: "POST", body: JSON.stringify({ ...d.run.request, hs_code: hs }) }); openRun(run_id); };
+  } else { ask.hidden = true; ask.innerHTML = ""; }
 
   // layers
   $("#layers").innerHTML = [
@@ -160,6 +170,7 @@ $("#request-form").onsubmit = async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   const body = { product: f.get("product"), target_country: f.get("target_country"), min_headcount: Number(f.get("min_headcount")), max_headcount: Number(f.get("max_headcount")) };
+  if (f.get("hs_code")) body.hs_code = String(f.get("hs_code")).trim();
   try { const { run_id } = await api("/runs", { method: "POST", body: JSON.stringify(body) }); await openRun(run_id); }
   catch (err) { alert(err.message); }
 };

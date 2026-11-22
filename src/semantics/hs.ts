@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { stems, norm } from "./text.js";
+import { stems, norm, hasPhrase } from "./text.js";
 import { FAMILIES } from "./synonyms.js";
 
 export interface HsHit { code: string; text: string; level: 2 | 4 | 6; score: number }
@@ -22,7 +22,7 @@ export function resolveHs(product: string, opts: { path?: string; retrieved_at?:
   const q = norm(product);
   const qs = stems(product);
   const hinted = new Set<string>();
-  for (const f of FAMILIES) if (f.triggers.some(t => q.includes(t))) f.hs_prefixes.forEach(p => hinted.add(p));
+  for (const f of FAMILIES) if (f.triggers.some(t => hasPhrase(q, t))) f.hs_prefixes.forEach(p => hinted.add(p));
 
   const hits: HsHit[] = [];
   for (const { row, stems: rs } of idx) {
@@ -44,5 +44,13 @@ export function resolveHs(product: string, opts: { path?: string; retrieved_at?:
   if (!best) return { status: "none", best: null, candidates, confidence: 0, source };
   // ambiguous when the runner-up is from a different 4-digit heading and nearly as good
   const differentHeading = candidates.some(c => c !== best && c.code.slice(0, 4) !== best.code.slice(0, 4) && best.score - c.score < 0.15);
-  return { status: differentHeading ? "ambiguous" : "ok", best, candidates, confidence, source };
+  const nearTie = candidates.some(c => c !== best && c.code.slice(0, 4) !== best.code.slice(0, 4) && best.score - c.score < 0.05);
+  const weak = best.score < 0.75 && !hinted.size;                       // no family hint and thin word overlap: do not pretend
+  return { status: differentHeading || nearTie || weak ? "ambiguous" : "ok", best, candidates, confidence, source };
+}
+
+/** Exact lookup of a 4- or 6-digit code in the HS 2022 list. */
+export function lookupHs(code: string, path?: string): HsHit | null {
+  const row = load(path).find(x => x.row.id === code);
+  return row ? { code: row.row.id, text: row.row.text.replace(/^\d+\s*-\s*/, ""), level: row.row.aggrlevel as 2 | 4 | 6, score: 1 } : null;
 }

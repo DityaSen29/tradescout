@@ -51,7 +51,7 @@ export function installStub(opts: { failEnrich?: boolean } = {}) {
     if (path === "/job/search") return reply(JOBS, 0.09);
     if (path === "/person/search") return reply(PEOPLE, 0.26);
     if (path === "/account/endpoints") return reply({ endpoints: [] }, 0);
-    if (path === "/web/search/live") return reply({ results: [{ title: "EU sets new labelling regulation for technical textiles", url: "https://example.com/news/eu-textile-labelling", snippet: "Oct 5, 2026 — New regulation on labelling of imported textiles takes effect." }] }, 1);
+    if (path === "/web/search/live") return reply({ results: [{ title: "EU sets new labelling regulation for technical textiles", url: "https://example.com/news/eu-textile-labelling", snippet: "Oct 5, 2026 — New EU regulation on labelling of imported textiles takes effect in Germany." }] }, 1);
     return reply({ error: `unstubbed ${path}` }, 0, 404);
   }) as any;
   return { calls, restore: () => { globalThis.fetch = realFetch; } };

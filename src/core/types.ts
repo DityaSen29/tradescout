@@ -7,6 +7,7 @@ export const RequestSchema = z.object({
   min_headcount: z.number().int().min(1).default(20),
   max_headcount: z.number().int().min(1).default(2000),
   fob_price_usd: z.number().positive().optional(),
+  hs_code: z.string().regex(/^\d{4,6}$/).optional(),      // the person's pick when the product was ambiguous
   notes: z.string().optional(),
 });
 export type TradeRequest = z.infer<typeof RequestSchema>;

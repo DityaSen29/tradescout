@@ -38,7 +38,7 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
   for (const cand of search.candidates) {
     const rec = records.get(cand.company_id);
     const sanctions = screen(cand.name);
-    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest: ${sanctions.near.name}, ${sanctions.near.score}, reviewed and cleared)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
+    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest entry ${sanctions.near.name} at ${sanctions.near.score}, below the ${92} threshold, listed for a person)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
     let adverse: number | null = null;
     if (rec) {
       const c = rec.c;
@@ -49,16 +49,18 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
       adverse = adverseItems.length;
       for (const n of adverseItems.slice(0, 3)) if (n.url) cand.evidence.push({ claim: `adverse news: ${n.title}`, source_type: "web", source_url: n.url, record_date: n.date ?? n.published_at ?? null, retrieved_at });
       const ep = "/company/enrich";
-      if (c.growth_12m != null) cand.evidence.push(apiEvidence(`${cand.name} 12-month headcount change ${c.growth_12m}%`, ep, cand.company_id, "headcount.growth_percent.12m", retrieved_at));
-      if (c.funding_usd != null) cand.evidence.push(apiEvidence(`${cand.name} total funding USD ${c.funding_usd}`, ep, cand.company_id, "funding.total_investment_usd", retrieved_at));
-      if (c.year_founded != null) cand.evidence.push(apiEvidence(`${cand.name} founded ${c.year_founded}`, ep, cand.company_id, "basic_info.year_founded", retrieved_at));
-      cand.evidence.push(apiEvidence(`${cand.name} news items in last 12 months: ${news.length}, adverse: ${adverse}`, ep, cand.company_id, "news", retrieved_at));
+      if (c.growth_12m != null) cand.evidence.push(apiEvidence(`${cand.name} 12-month headcount change ${c.growth_12m}%`, ep, cand.company_id, "headcount.growth_percent.12m", retrieved_at, null, ctx.runId));
+      if (c.funding_usd != null) cand.evidence.push(apiEvidence(`${cand.name} total funding USD ${c.funding_usd}`, ep, cand.company_id, "funding.total_investment_usd", retrieved_at, null, ctx.runId));
+      if (c.year_founded != null) cand.evidence.push(apiEvidence(`${cand.name} founded ${c.year_founded}`, ep, cand.company_id, "basic_info.year_founded", retrieved_at, null, ctx.runId));
+      cand.evidence.push(apiEvidence(`${cand.name} news items in last 12 months: ${news.length}, adverse: ${adverse}`, ep, cand.company_id, "news", retrieved_at, ctx.runId));
     }
     const trust = scoreTrust({ headcount: cand.headcount, growth_12m: cand.growth_12m, year_founded: cand.year_founded, domain: cand.domain, sanctions: sanctions.checked_lists.length ? sanctions : null, adverse_news: adverse, enriched: !!rec, last_round_type: rec?.c.last_round_type ?? null }, year);
     cand.trust_tier = trust.tier; cand.trust_reasons = trust.reasons;
     cand.evidence.push(sanctionsEvidence);
     for (const e of cand.evidence) ctx.evidence(cand.company_id, e);
     if (!rec && ids.includes(Number(cand.company_id))) cand.unresolved.push("cannot verify: no enrichment record returned");
+    if (sanctions.hit) cand.unresolved.push(`possible sanctions match on name only (${sanctions.list} "${sanctions.name}", score ${sanctions.score}); confirm identity before any contact`);
+    if (!sanctions.hit && sanctions.near) cand.unresolved.push(`sanctions near-match below threshold (${sanctions.near.list} "${sanctions.near.name}", score ${sanctions.near.score}); not a hit, listed for a person`);
   }
   return { candidates: search.candidates, enriched_ids: enrichedIds, notes };
 }

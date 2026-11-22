@@ -23,6 +23,7 @@ export function buildPipeline(): StepDef[] {
         const r = parseRequest(ctx.request);
         for (const e of r.evidence) ctx.evidence("request", e);
         if (r.status === "cannot_verify") throw new Error(`cannot verify request: ${r.questions.join(" ")}`);
+        if (r.status === "needs_input") throw new Error(`needs input: ${r.questions.join(" ")} Re-run with hs_code set to one of ${r.hs.candidates.slice(0, 3).map(c => c.code).join(", ")}.`);
         return r;
       },
     },

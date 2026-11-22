@@ -107,3 +107,7 @@ label input { margin-top: 4px; }
   .columns { grid-template-columns: 1fr; } .layers { grid-template-columns: 1fr; } .steps { grid-template-columns: repeat(4, 1fr); row-gap: 14px; }
   .masthead { grid-template-columns: 1fr; } .sheet { padding: 16px; } .row { grid-template-columns: 32px 1fr; } .scores { grid-column: 2; text-align: left; } .fit { justify-content: flex-start; }
 }
+
+.ask { margin-top: 14px; padding: 12px 14px; border-left: 3px solid var(--amber); background: var(--white); }
+.ask .btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ask .btns button { font-size: 13px; }

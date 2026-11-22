@@ -15,7 +15,7 @@ export function scoreTrust(t: TrustInput, year = new Date().getFullYear()): Trus
   let tier: TrustTier = "GREEN";
   const amber = (code: string, why: string) => { if (tier !== "RED") tier = "AMBER"; fired.push(code); reasons.push(why); };
   const red = (code: string, why: string) => { tier = "RED"; fired.push(code); reasons.push(why); };
-  if (t.sanctions?.hit) red("SANCTIONS_MATCH", `name matches ${t.sanctions.list ?? "a sanctions list"} entry "${t.sanctions.name}" (score ${t.sanctions.score})`);
+  if (t.sanctions?.hit) amber("SANCTIONS_NAME_MATCH", `possible sanctions match on name only: ${t.sanctions.list ?? "a sanctions list"} entry "${t.sanctions.name}" (score ${t.sanctions.score}); needs a person to confirm identity`);
   if (t.adverse_news != null && t.adverse_news >= 2) red("ADVERSE_NEWS_2", `${t.adverse_news} adverse news items in the last 12 months`);
   if (t.growth_12m != null && t.growth_12m <= -30) red("HEADCOUNT_COLLAPSE", `12-month headcount down ${t.growth_12m.toFixed(0)}%`);
   if (!t.enriched) amber("NO_ENRICHMENT", "insufficient data: no enrichment record");

@@ -41,6 +41,16 @@ function start(runId: string, mode: "run" | "resume") {
 
 const json = (res: ServerResponse, code: number, body: unknown) => { res.writeHead(code, { "content-type": "application/json", "access-control-allow-origin": "*" }); res.end(JSON.stringify(body)); };
 const readBody = (req: IncomingMessage) => new Promise<any>((resolve, reject) => { let s = ""; req.on("data", c => s += c); req.on("end", () => { try { resolve(s ? JSON.parse(s) : {}); } catch (e) { reject(e); } }); });
+const esc = (v: unknown) => String(v ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]!));
+/** Depth-first search of a stored response for the record whose id fields match. */
+function findRecord(node: any, id: string, depth = 0): any | null {
+  if (!node || typeof node !== "object" || depth > 8) return null;
+  const ids = [node.crustdata_company_id, node.crustdata_person_id, node.job_id, node.id, node?.basic_info?.crustdata_company_id].filter(v => v !== undefined && v !== null).map(String);
+  if (ids.includes(id)) return node;
+  if (node.company_data && findRecord(node.company_data, id, depth + 1)) return node.company_data;
+  for (const v of Array.isArray(node) ? node : Object.values(node)) { const r = findRecord(v, id, depth + 1); if (r) return r; }
+  return null;
+}
 const MIME: Record<string, string> = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png" };
 
 const server = createServer(async (req, res) => {
@@ -78,6 +88,19 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "search", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "search" }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/ledger$/)) && m === "GET") return json(res, 200, { calls: ledger.listCalls(mm[1]), totals: ledger.totals(mm[1]), run: ledger.getRun(mm[1]) });
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/evidence$/)) && m === "GET") return json(res, 200, ledger.listEvidence(mm[1]));
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/record$/)) && m === "GET") {
+      const runId = mm[1]; const endpoint = url.searchParams.get("endpoint") ?? ""; const id = url.searchParams.get("id") ?? ""; const field = url.searchParams.get("field") ?? "";
+      const rows = ledger.db.prepare(`SELECT id, retrieved_at, response_json FROM calls WHERE run_id=? AND endpoint=? AND status='ok' AND response_json IS NOT NULL ORDER BY retrieved_at DESC`).all(runId, endpoint) as any[];
+      for (const row of rows) {
+        const found = findRecord(JSON.parse(row.response_json), id);
+        if (found) {
+          const value = field.split(".").reduce((o: any, k) => (o && typeof o === "object" ? o[k] : undefined), found);
+          const html = `<!doctype html><meta charset="utf-8"><title>Record ${esc(id)}</title><body style="font-family:system-ui;max-width:900px;margin:30px auto;padding:0 16px;color:#1b2a41"><h1 style="font-size:20px">Crustdata ${esc(endpoint)} record ${esc(id)}</h1><p>Retrieved ${esc(row.retrieved_at)} by run ${esc(runId)}, call ${esc(row.id)}. Stored response, served locally; the API itself is POST-only.</p><h2 style="font-size:16px">Field <code>${esc(field)}</code></h2><pre style="background:#f3f5f1;padding:12px;border-left:3px solid #2e7d5b;white-space:pre-wrap">${esc(JSON.stringify(value, null, 2))}</pre><details><summary>Whole record</summary><pre style="white-space:pre-wrap;font-size:12px">${esc(JSON.stringify(found, null, 2))}</pre></details></body>`;
+          res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); return res.end(html);
+        }
+      }
+      return json(res, 404, { error: `record ${id} not found in stored responses for ${endpoint}` });
+    }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph }); }
     if ((mm = p.match(/^\/api\/actions\/([^/]+)\/(approve|reject|execute)$/)) && m === "POST") {
       const [, id, verb] = mm;

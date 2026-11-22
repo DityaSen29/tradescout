@@ -10,7 +10,7 @@ Product and target market in. Out: a cited market signal, the duty and policy pi
 
 **Who pays.** The export manager or owner of a 50 to 500 person manufacturer. Secondary buyers: export promotion councils, 3PL and freight forwarders opening a new lane, and trade-credit insurers screening buyers.
 
-**The price we would charge.** ₹1,500 per market report, or ₹9,000 a month for up to ten markets with monitoring. **What one job costs us to run:** about 30 Crustdata credits (28.2 measured on the live run) plus free public data; no model calls in the current build. At list price that is well under ₹100 per run, so the margin funds the human review desk for "needs a person" items.
+**The price we would charge.** ₹1,500 per market report, or ₹9,000 a month for up to ten markets with monitoring. **What one job costs us to run:** 29.2 Crustdata credits measured on the live run (about ₹25 at list price, where 15,000 credits cost roughly ₹12,500) plus free public data; no model calls in the current build. That is well under ₹100 per run, so the margin funds the human review desk for "needs a person" items.
 
 ## What it does now
 
@@ -92,7 +92,9 @@ Diagram: [docs/architecture.md](docs/architecture.md). Test cases: [docs/test-ca
 
 Every call is a row in the ledger with endpoint, credits (from the `x-credits-used` header), latency and retrieval time; the UI shows the running total against the ceiling. Every claim in the output carries a source URL, the record id and field it came from, the record's date where the source has one, and the retrieval time. Model calls: none in this build; the ledger has a column for them.
 
-**Personal data.** People appear as name, title and employer from an indexed professional dataset; no emails, phones or profile enrichment are fetched, no outreach is sent, and the ledger is local to the machine running the desk. Drafts are written to `data/out/`, which is not committed.
+**Personal data.** People appear as name, title and employer from an indexed professional dataset; no emails, phones or profile enrichment are fetched and no outreach is sent. The ledger (`data/tradescout.db` and its `-wal`/`-shm` files) and the drafts in `data/out/` stay on the machine running the desk and are git-ignored.
+
+**Disclosure.** Two mistakes during the build put personal data into this public repository's history and we are not rewriting history, because the rules forbid it. Commit `544a021` included one generated draft `.eml` naming a real executive, removed from tracking in `17c5731`. The sqlite write-ahead and shared-memory files were tracked from the first commit until the commit that adds this paragraph, and they hold the names and titles returned by person search. Both are now ignored. The data is business-role information from a professional dataset, but it should not have been published, and the README said otherwise until now.
 
 ## The approaches we tried
 

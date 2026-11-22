@@ -17,4 +17,4 @@ Gathered before the live run. Every case uses records dated after 1 September 20
 | 11 | same request run twice | Second run's monitor shows the previous snapshot and a change list (empty when nothing moved). | monitor |
 | 12 | policy news with no publication date | Does not set the policy flag; listed as "undated mention needs a person". A year in the text older than last year or in the future is not a date. | cannot verify |
 
-Cases 2 to 12 run offline in `tests/` against a stubbed Crustdata (mock data in tests only). Case 1 was run live on 22 November 2026 at 12:27 IST: 25 companies, 5 GREEN, 3 buyers, 3 drafts, 28.2 credits.
+Cases 2 to 12 run offline in `tests/` against a stubbed Crustdata (mock data in tests only). Case 1 was run live on 22 November 2026 at 12:27 IST: 25 companies, 5 GREEN, 3 buyers, 3 drafts, 29.2 credits after the market, duty and policy layers.

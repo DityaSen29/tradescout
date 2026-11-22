@@ -25,7 +25,7 @@ export async function intentStep(ctx: StepCtx): Promise<LayerResult<Record<strin
     const title = j.job_details?.title ?? j.title ?? "";
     if (!out[cid]) continue;
     out[cid].open++;
-    if (BUYING_TITLE.test(title)) { out[cid].buying++; evidence.push(apiEvidence(`open role "${title}" at company ${cid}`, "/job/search", String(j.job_id ?? j.id ?? `${cid}:${title}`), "job_details.title", retrieved_at, j.metadata?.date_added ?? null)); }
+    if (BUYING_TITLE.test(title)) { out[cid].buying++; evidence.push(apiEvidence(`open role "${title}" at company ${cid}`, "/job/search", String(j.job_id ?? j.id ?? `${cid}:${title}`), "job_details.title", retrieved_at, j.metadata?.date_added ?? null, ctx.runId)); }
   }
   for (const c of vet.candidates) {
     const o = out[c.company_id]; if (!o) continue;

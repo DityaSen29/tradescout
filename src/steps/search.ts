@@ -49,10 +49,10 @@ export async function searchStep(ctx: StepCtx): Promise<SearchOutput> {
       fit_score: fit.score, fit_reasons: fit.reasons, trust_tier: "AMBER", trust_reasons: ["not yet vetted"], intent_tags: [], graph_score: 0, rank_score: 0, contact: null, evidence: [], unresolved: [],
     };
     const ep = "/company/search";
-    cand.evidence.push(apiEvidence(`${c.name} is a company record (${c.domain ?? "no domain"})`, ep, c.company_id, "basic_info.name", retrieved_at));
-    if (c.headcount != null) cand.evidence.push(apiEvidence(`${c.name} headcount ${c.headcount}`, ep, c.company_id, "headcount.total", retrieved_at));
-    if (country) cand.evidence.push(apiEvidence(`${c.name} located in ${country}`, ep, c.company_id, "locations.country", retrieved_at));
-    if (c.growth_6m != null) cand.evidence.push(apiEvidence(`${c.name} 6-month headcount growth ${c.growth_6m}%`, ep, c.company_id, "headcount.growth_percent.6m", retrieved_at));
+    cand.evidence.push(apiEvidence(`${c.name} is a company record (${c.domain ?? "no domain"})`, ep, c.company_id, "basic_info.name", retrieved_at, null, ctx.runId));
+    if (c.headcount != null) cand.evidence.push(apiEvidence(`${c.name} headcount ${c.headcount}`, ep, c.company_id, "headcount.total", retrieved_at, null, ctx.runId));
+    if (country) cand.evidence.push(apiEvidence(`${c.name} located in ${country}`, ep, c.company_id, "locations.country", retrieved_at, null, ctx.runId));
+    if (c.growth_6m != null) cand.evidence.push(apiEvidence(`${c.name} 6-month headcount growth ${c.growth_6m}%`, ep, c.company_id, "headcount.growth_percent.6m", retrieved_at, null, ctx.runId));
     for (const e of cand.evidence) ctx.evidence(c.company_id, e);
     const id = nid("Company", c.company_id);
     g.upsertNode({ label: "Company", id, props: { name: c.name, domain: c.domain, headcount: c.headcount, industries: c.industries, fit: fit.score } });

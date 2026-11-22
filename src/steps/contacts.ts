@@ -39,7 +39,7 @@ export async function contactsStep(ctx: StepCtx): Promise<{ found: number; notes
     const best = people[0];
     if (!best) { c.unresolved.push("no procurement or management contact found in person search; " + ((r.data.profiles as any[]).some(p => flattenPerson(p).positions.some(pos => pos.company_id === c.company_id)) ? "only sales/support titles returned" : "no people returned for this company")); continue; }
     c.contact = { name: best.person.name, title: best.pos.title ?? best.person.headline ?? "", company: best.pos.company ?? c.name, linkedin: null };
-    const e = apiEvidence(`${best.person.name} is ${best.pos.title ?? "a decision-maker"} at ${c.name} (seniority ${best.pos.seniority ?? "n/a"})`, "/person/search", best.person.person_id || best.person.name, "experience.employment_details.current.title", retrieved_at);
+    const e = apiEvidence(`${best.person.name} is ${best.pos.title ?? "a decision-maker"} at ${c.name} (seniority ${best.pos.seniority ?? "n/a"})`, "/person/search", best.person.person_id || best.person.name, "experience.employment_details.current.title", retrieved_at, null, ctx.runId);
     c.evidence.push(e); ctx.evidence(c.company_id, e); found++;
   }
   ctx.log(`contacts: ${found}/${targets.length} (${r.cached ? "memo" : `${r.credits} credits`})`);

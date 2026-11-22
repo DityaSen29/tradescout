@@ -20,3 +20,11 @@ export function jaccard(a: Iterable<string>, b: Iterable<string>): number {
   let inter = 0; for (const x of A) if (B.has(x)) inter++;
   return inter / (A.size + B.size - inter);
 }
+
+/** Whole-word phrase match on normalised text: "tea" does not match "steam". Plural/singular tolerant via stems. */
+export function hasPhrase(text: string, phrase: string): boolean {
+  const ts = stems(text), ps = stems(phrase);
+  if (!ps.length) return false;
+  for (let i = 0; i + ps.length <= ts.length; i++) { let ok = true; for (let j = 0; j < ps.length; j++) if (ts[i + j] !== ps[j]) { ok = false; break; } if (ok) return true; }
+  return false;
+}

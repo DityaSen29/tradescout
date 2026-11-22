@@ -19,6 +19,13 @@ describe("HS resolution", () => {
   it("gives the same answer for two wordings", () => {
     expect(resolveHs("Basmati Rice").best!.code).toBe(resolveHs("rice, basmati").best!.code);
   });
+  it("does not let 'tea' fire on 'steam turbines'", () => {
+    const r = resolveHs("steam turbines"); expect(r.best!.code.startsWith("8406")).toBe(true);
+    expect(buildKeywordMap("steam turbines").families).not.toContain("tea_coffee");
+  });
+  it("marks a near-tie between headings as ambiguous", () => {
+    expect(resolveHs("industrial textiles").status).toBe("ambiguous");
+  });
   it("returns none for gibberish", () => {
     expect(resolveHs("zxqv blorp").status).toBe("none");
   });
@@ -35,6 +42,11 @@ describe("country resolution", () => {
   it("returns null for an unknown place", () => {
     expect(resolveCountry("Narnia")).toBeNull();
   });
+  it("does not read small words as country codes and skips retired entries", () => {
+    expect(resolveCountry("in Germany")!.iso3).toBe("DEU");
+    expect(resolveCountry("to the UAE")!.iso3).toBe("ARE");
+    expect(resolveCountry("USA")!.m49).toBe(842);
+  });
 });
 
 describe("keyword map", () => {
@@ -47,6 +59,10 @@ describe("keyword map", () => {
 });
 
 describe("parse step", () => {
+  it("honours the person's HS pick", () => {
+    const r = parseRequest({ product: "industrial textiles", target_country: "Germany", min_headcount: 20, max_headcount: 2000, hs_code: "5911" });
+    expect(r.status).toBe("ok"); expect(r.hs.best!.code).toBe("5911");
+  });
   it("produces a filter plan for a clear request", () => {
     const r = parseRequest({ product: "basmati rice", target_country: "UAE", min_headcount: 20, max_headcount: 2000 });
     expect(r.status).toBe("ok");

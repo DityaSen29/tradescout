@@ -1,5 +1,5 @@
 import type { TradeRequest, Evidence } from "../core/types.js";
-import { resolveHs, type HsResolution } from "./hs.js";
+import { resolveHs, lookupHs, type HsResolution } from "./hs.js";
 import { resolveCountry, type Country } from "./country.js";
 import { buildKeywordMap, type KeywordMap } from "./keywords.js";
 
@@ -25,7 +25,11 @@ export interface Resolved {
  * Vague product → ask for one of up to three HS codes. Unknown country → cannot proceed, say what is missing.
  */
 export function parseRequest(req: TradeRequest, retrieved_at = new Date().toISOString()): Resolved {
-  const hs = resolveHs(req.product, { retrieved_at });
+  let hs = resolveHs(req.product, { retrieved_at });
+  if (req.hs_code) {
+    const pick = hs.candidates.find(c => c.code === req.hs_code) ?? lookupHs(req.hs_code);
+    if (pick) hs = { ...hs, status: "ok", best: pick, candidates: [pick, ...hs.candidates.filter(c => c.code !== pick.code)], confidence: 1 };
+  }
   const country = resolveCountry(req.target_country);
   const keywords = buildKeywordMap(req.product);
   const questions: string[] = [];

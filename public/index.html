@@ -25,6 +25,7 @@
         <label>Min staff<input name="min_headcount" type="number" value="20" min="1"></label>
         <label>Max staff<input name="max_headcount" type="number" value="2000" min="1"></label>
       </div>
+      <label>HS code, if you already know it<input name="hs_code" placeholder="5911" pattern="\d{4,6}" autocomplete="off"></label>
       <button type="submit" class="primary">Run the desk</button>
       <p class="hint">About 20 to 30 Crustdata credits per run. Nothing is sent to anyone; drafts wait for your approval.</p>
     </form>
@@ -47,6 +48,7 @@
       </div>
     </div>
 
+    <section class="ask" id="ask" hidden></section>
     <ol class="steps" id="steps"></ol>
 
     <div class="columns">

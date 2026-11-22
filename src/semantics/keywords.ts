@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { FAMILIES, ROLE_TERMS } from "./synonyms.js";
-import { norm, stems, tokens } from "./text.js";
+import { norm, stems, tokens, hasPhrase } from "./text.js";
 
 export interface KeywordMap {
   families: string[];
@@ -25,7 +25,7 @@ function industries(path = "data/raw/static-linkedin-industries.json"): string[]
 /** Build the keyword map that drives search, scoring and the graph. Deterministic. */
 export function buildKeywordMap(product: string): KeywordMap {
   const q = norm(product);
-  const fams = FAMILIES.filter(f => f.triggers.some(t => q.includes(t)));
+  const fams = FAMILIES.filter(f => f.triggers.some(t => hasPhrase(q, t)));
   const product_terms = tokens(product);
   const expansions = [...new Set(fams.flatMap(f => f.expand))];
   const wanted = new Set([...fams.flatMap(f => f.industries), "Wholesale", "Import & Export", "Wholesale Import and Export", "International Trade and Development"]);
