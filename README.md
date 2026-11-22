@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 5:48 PM IST on 22 November 2026, at commit [`a5bbb1d`](https://github.com/shivanshpilani/tradescout/commit/a5bbb1d).
+Every capability in this document carries one of these labels. Status is as of 5:55 PM IST on 22 November 2026, at commit [`22c152e`](https://github.com/shivanshpilani/tradescout/commit/22c152e). The test results are from `a5bbb1d`. Later commits changed one API response and the submission answers.
 
 | Label | Meaning |
 |---|---|
@@ -186,6 +186,7 @@ These results were recorded by the team during the build. The run databases hold
 | Customs route, Ecuador shock absorbers | 39 exact-product importers from export files | The route isn't built around menthol |
 | Research route, UAE steel gratings | The agent searched and read pages. The critic rejected weak claims. | A market without records gets evidence without invented imports |
 | Customs route, US menthol | 653 descriptions read, 175 importers, 33 with exact-product proof | Exact-product proof is much narrower than "imports under the code" |
+| Customs route through to checked drafts, US menthol | One run cost 12.5 credits and $0.026 of model spend | The customs route also reaches an approval-ready draft |
 | Kill after paid calls, then resume | 15.95 credits before and 15.95 after | Resume didn't pay again |
 
 The menthol runs also exposed real weaknesses:
@@ -620,7 +621,8 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 | `src/crm/` | CRM engine, HubSpot adapter and simulator, plus a placeholder for other CRMs |
 | [`docs/api.md`](https://github.com/shivanshpilani/tradescout/blob/pivot/agentic-buyer-desk/docs/api.md) | API and event contract |
 | `src/pipeline.ts`, `src/steps/`, `src/layers/`, `src/scoring/` | The earlier TradeScout product, kept for its tests and shared helpers |
-| `docs/architecture.md`, `docs/submission.md`, `docs/test-cases.md`, `docs/context.md` | These describe the earlier product. This README supersedes them. |
+| `docs/submission.md` | The submission answers for this product |
+| `docs/architecture.md`, `docs/test-cases.md`, `docs/context.md` | These describe the earlier product. This README supersedes them. |
 
 ### Data and safety
 
