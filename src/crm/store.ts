@@ -2,7 +2,7 @@ import { randomUUID, createHash } from "node:crypto";
 import type { Ledger } from "../ledger/ledger.js";
 import { budgetDay, envLimit } from "../core/limits.js";
 import { BudgetExceeded } from "../core/types.js";
-import type { Kind, Props } from "./adapter.js";
+import type { Kind, Limits, Props } from "./adapter.js";
 import type { SyncLead } from "./mapping.js";
 
 export interface Link {
@@ -18,7 +18,7 @@ export interface Job { lead_id: string; run_id: string; lead: SyncLead; attempts
 
 /** CRM sync state, in the same sqlite file as the run ledger. One namespace per adapter. */
 export class Store {
-  constructor(readonly ledger: Ledger, readonly crm: string) {
+  constructor(readonly ledger: Ledger, readonly crm: string, private provider: string, private limits: Limits) {
     ledger.db.exec(`
       CREATE TABLE IF NOT EXISTS crm_meta (crm TEXT, key TEXT, value TEXT, PRIMARY KEY (crm, key));
       CREATE TABLE IF NOT EXISTS crm_outbox (
@@ -41,6 +41,8 @@ export class Store {
       CREATE INDEX IF NOT EXISTS crm_usage_day ON crm_usage(crm, day);
       CREATE TABLE IF NOT EXISTS crm_lock (crm TEXT PRIMARY KEY, owner TEXT NOT NULL, until_at INTEGER NOT NULL);
     `);
+    for (const column of ["units REAL NOT NULL DEFAULT 1", "at INTEGER NOT NULL DEFAULT 0"])
+      try { ledger.db.exec(`ALTER TABLE crm_usage ADD COLUMN ${column}`); } catch { /* column exists */ }
   }
   private sql(q: string) { return this.ledger.db.prepare(q); }
   atomic<T>(fn: () => T): T {
@@ -52,20 +54,32 @@ export class Store {
   setMeta(key: string, value: string) { this.sql(`INSERT INTO crm_meta VALUES (?,?,?) ON CONFLICT DO UPDATE SET value=excluded.value`).run(this.crm, key, value); }
 
   // ---- hard caps: counted before the request, so a crash still counts
-  reserveCall(runId: string) {
+  private dayCap() {
+    const name = this.provider === "zoho" ? "CRM_ZOHO_DAILY_CREDIT_LIMIT" : "CRM_DAILY_CALL_LIMIT";
+    return { name, cap: envLimit(name, this.limits.day) };
+  }
+  private usedToday(): number {
+    const row = this.limits.rolling
+      ? this.sql(`SELECT COALESCE(SUM(units),0) n FROM crm_usage WHERE crm=? AND at>?`).get(this.crm, Date.now() - 86_400_000)
+      : this.sql(`SELECT COALESCE(SUM(units),0) n FROM crm_usage WHERE crm=? AND day=?`).get(this.crm, budgetDay());
+    return Number((row as any).n);
+  }
+  reserveCall(runId: string, units = 1) {
     this.atomic(() => {
-      for (const [col, value, name, fallback] of [["run_id", runId, "CRM_RUN_CALL_LIMIT", 500], ["day", budgetDay(), "CRM_DAILY_CALL_LIMIT", 10_000]] as const) {
-        const used = (this.sql(`SELECT COUNT(*) n FROM crm_usage WHERE crm=? AND ${col}=?`).get(this.crm, value) as any).n;
-        // polling has no run, so only the daily cap applies to it
-        if (col === "run_id" && value === "crm-poll") continue;
-        const cap = envLimit(name, fallback);
-        if (used + 1 > cap) throw new BudgetExceeded("credits", `${name} ${cap} blocks this CRM call; queued work is kept`);
+      const refuse = (name: string, cap: number) => new BudgetExceeded("credits", `${name} ${cap} blocks this CRM call; queued work is kept`);
+      // polling has no run, so only the daily cap applies to it
+      if (runId !== "crm-poll") {
+        const cap = envLimit("CRM_RUN_CALL_LIMIT", this.limits.run);
+        const used = Number((this.sql(`SELECT COALESCE(SUM(units),0) n FROM crm_usage WHERE crm=? AND run_id=?`).get(this.crm, runId) as any).n);
+        if (used + units > cap) throw refuse("CRM_RUN_CALL_LIMIT", cap);
       }
-      this.sql(`INSERT INTO crm_usage (crm, run_id, day) VALUES (?,?,?)`).run(this.crm, runId, budgetDay());
+      const { name, cap } = this.dayCap();
+      if (this.usedToday() + units > cap) throw refuse(name, cap);
+      this.sql(`INSERT INTO crm_usage (crm, run_id, day, units, at) VALUES (?,?,?,?,?)`).run(this.crm, runId, budgetDay(), units, Date.now());
     });
   }
   callsToday() {
-    return { used: Number((this.sql(`SELECT COUNT(*) n FROM crm_usage WHERE crm=? AND day=?`).get(this.crm, budgetDay()) as any).n), limit: envLimit("CRM_DAILY_CALL_LIMIT", 10_000) };
+    return { used: this.usedToday(), limit: this.dayCap().cap, window: this.limits.rolling ? "24 hours" : "day, IST", unit: this.provider === "zoho" ? "credits" : "calls" };
   }
 
   // ---- one worker per CRM, across processes
@@ -106,6 +120,19 @@ export class Store {
   }
   requeue(leadId: string) { this.sql(`UPDATE crm_outbox SET state='pending', attempts=0, next_at=0, error=NULL WHERE crm=? AND lead_id=?`).run(this.crm, leadId); }
   requeueFailed() { this.sql(`UPDATE crm_outbox SET state='pending', attempts=0, next_at=0, error=NULL WHERE crm=? AND state IN ('retry','failed')`).run(this.crm); }
+  settled(): { run_id: string; lead: SyncLead }[] {
+    return (this.sql(`SELECT run_id, lead_json FROM crm_outbox WHERE crm=? AND state IN ('done','review')`).all(this.crm) as any[]).map(r => ({ run_id: r.run_id, lead: JSON.parse(r.lead_json) }));
+  }
+  /** Leads queued before any CRM was connected follow the one that gets connected. */
+  adoptQueue(from: string) {
+    if (this.sql(`SELECT 1 FROM crm_links WHERE crm=? LIMIT 1`).get(from)) return;
+    this.sql(`UPDATE OR IGNORE crm_outbox SET crm=? WHERE crm=? AND state<>'in_flight'`).run(this.crm, from);
+  }
+  sharedWith(provider: string, account: string): string | null {
+    const r = this.sql(`SELECT a.crm FROM crm_meta a JOIN crm_meta p ON p.crm=a.crm AND p.key='provider'
+      WHERE a.key='account' AND a.value=? AND p.value=? AND a.crm<>? AND a.crm LIKE '%@%' LIMIT 1`).get(account, provider, this.crm) as any;
+    return r?.crm ?? null;
+  }
   outbox(): { lead_id: string; company: string; state: string; attempts: number; error: string | null }[] {
     return this.sql(`SELECT lead_id, json_extract(lead_json,'$.company') company, state, attempts, error FROM crm_outbox WHERE crm=? ORDER BY updated_at DESC`).all(this.crm) as any;
   }
@@ -130,6 +157,10 @@ export class Store {
     this.sql(`INSERT INTO crm_links VALUES (?,?,?,?,?,?,?,?) ON CONFLICT DO UPDATE SET
       remote_id=excluded.remote_id, natural_key=excluded.natural_key, state=excluded.state, pushed_json=excluded.pushed_json, held_json=excluded.held_json`)
       .run(this.crm, l.lead_id, l.kind, l.remote_id, l.natural, l.state, JSON.stringify(l.pushed), JSON.stringify(l.held));
+  }
+  paused(): { lead_id: string; kind: Kind; remote_id: string; company: string }[] {
+    return this.sql(`SELECT l.lead_id, l.kind, l.remote_id, json_extract(o.lead_json,'$.company') company FROM crm_links l
+      LEFT JOIN crm_outbox o ON o.crm=l.crm AND o.lead_id=l.lead_id WHERE l.crm=? AND l.state='paused'`).all(this.crm) as any;
   }
   dropLink(leadId: string, kind: Kind) { this.sql(`DELETE FROM crm_links WHERE crm=? AND lead_id=? AND kind=?`).run(this.crm, leadId, kind); }
   isAssociated(a: string, b: string) { return !!this.sql(`SELECT 1 FROM crm_associations WHERE crm=? AND a=? AND b=?`).get(this.crm, a, b); }
@@ -166,9 +197,12 @@ export class Store {
   clearField(leadId: string, kind: Kind, field: string) {
     this.sql(`DELETE FROM crm_conflicts WHERE crm=? AND type='field' AND lead_id=? AND kind=? AND field=? AND status='open'`).run(this.crm, leadId, kind, field);
   }
-  /** An undecided delete, merge, duplicate or change of person stops writes to that record. */
+  clearPerson(leadId: string) {
+    this.sql(`DELETE FROM crm_conflicts WHERE crm=? AND type='person' AND lead_id=? AND status='open'`).run(this.crm, leadId);
+  }
+  /** An undecided delete, merge or duplicate stops writes to that record. A change of person is checked again each push. */
   awaitingPerson(leadId: string, kind: Kind) {
-    return !!this.sql(`SELECT 1 FROM crm_conflicts WHERE crm=? AND lead_id=? AND kind=? AND type<>'field' AND status='open'`).get(this.crm, leadId, kind);
+    return !!this.sql(`SELECT 1 FROM crm_conflicts WHERE crm=? AND lead_id=? AND kind=? AND type NOT IN ('field','person') AND status='open'`).get(this.crm, leadId, kind);
   }
   conflict(id: string) { return this.sql(`SELECT * FROM crm_conflicts WHERE crm=? AND id=?`).get(this.crm, id) as unknown as Conflict | undefined; }
   openConflicts(): Conflict[] {

@@ -9,6 +9,8 @@ import type { Lead } from "../src/buyer/contract.js";
 import { CrmSync } from "../src/crm/engine.js";
 import { HubSpot } from "../src/crm/hubspot.js";
 import { Zoho } from "../src/crm/zoho.js";
+import { Connections } from "../src/crm/credentials.js";
+import { TokenSource } from "../src/crm/oauth.js";
 import { HubSpotSimulator } from "../src/crm/simulator.js";
 import { createCrmRouter, validSignature } from "../src/crm/router.js";
 import { syncLeads } from "../src/crm/index.js";
@@ -241,9 +243,14 @@ describe("failures and caps", () => {
     t.sim.fail.push({ match: /batch\/read/, status: 503 });
     expect(await t.crm.pull()).toMatchObject({ conflicts: 0, error: expect.stringMatching(/503/) });
   });
-  it("the Zoho stub says so and sends nothing", async () => {
-    const r = await syncLeads(new Ledger(":memory:"), "r", [lead()], m => new Zoho(m));
-    expect(r).toMatchObject({ created: 0, errors: 1 }); expect(r.details[0].message).toMatch(/stub/);
+  it("Zoho without a sign-in says so and sends nothing", async () => {
+    const http = vi.fn(), dir = mkdtempSync(join(tmpdir(), "crm-"));
+    try {
+      const tokens = new TokenSource(new Connections(join(dir, "c.json"), ["zoho"]), "zoho", http as any);
+      const r = await syncLeads(new Ledger(":memory:"), "r", [lead()], (m, state) => new Zoho(m, { tokens, state, fetch: http as any }));
+      expect(r).toMatchObject({ created: 0, errors: 1 }); expect(r.details[0].message).toMatch(/not connected/);
+      expect(http).not.toHaveBeenCalled();
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
 
