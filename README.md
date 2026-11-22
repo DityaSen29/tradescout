@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:17 PM IST on 22 November 2026, at commit [`f95a3fd`](https://github.com/shivanshpilani/tradescout/commit/f95a3fd).
+Every capability in this document carries one of these labels. Status is as of 6:19 PM IST on 22 November 2026, at commit [`f95a3fd`](https://github.com/shivanshpilani/tradescout/commit/f95a3fd).
 
 | Label | Meaning |
 |---|---|
@@ -125,7 +125,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Capability | Status | Detail |
 |---|---|---|
 | Planner agent: product specification and HS expansion | **Live** | Every proposed code is checked against the official HS 2022 list |
-| Exporter's origin read from its own brief | **Live for planning and customs ranking. Emails tested offline.** | The stated country, or the quoted words that show it, drive ranking and the seller's claim in emails |
+| Exporter's origin read from its own brief | **Live** | The stated country, or the quoted words that show it, drive ranking and the seller's claim in emails |
 | Customs route from export files | **Live** | The demo uses US menthol import data, loaded locally |
 | Customs matcher: exact product or category only | **Live** | Reads shipment descriptions after redaction |
 | Researcher agent for markets without customs data | **Live** | Chooses its own Crustdata searches and reads pages |
@@ -195,7 +195,7 @@ These results were recorded by the team during the build. The run databases hold
 
 A non-menthol product, stainless hose clamps in Australia, also ran live on the research route. With no customs data, the researcher searched and read pages, and the critic accepted three buyers with quotes, for 5.8 credits.
 
-The origin reading, added at 6:08 PM, ran live through planning and customs for sellers in China, Viet Nam and Uttar Pradesh, and for one brief that stated no origin.
+The origin reading, added at 6:08 PM, ran live through planning and customs for sellers in China, Viet Nam and Uttar Pradesh, and for one brief that stated no origin. A Vietnamese seller's brief then ran end to end on the research route, to three work emails and three checked drafts, all stating Viet Nam.
 
 ### How we tested it
 
