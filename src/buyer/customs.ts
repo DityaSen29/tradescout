@@ -9,6 +9,7 @@ import { hashOf } from "../ledger/ledger.js";
 import { newLead, tracer, type Trace } from "./common.js";
 import type { BuyingBehaviour, Lead } from "./contract.js";
 import type { Plan, CustomsQuery } from "./plan.js";
+import { customsSource } from "./customs-source.js";
 
 /** One line of an export file, as written by scripts/import-exports.py. */
 export interface Row {
@@ -67,12 +68,29 @@ export function behaviourOf(rows: Row[]): BuyingBehaviour {
 export interface CustomsOutput {
   coverage: "records" | "none"; rows_in_market: number; rows_matched: number; leads: Lead[]; needs_research: boolean; trace: Trace[];
 }
+/**
+ * Manifest descriptions carry party names, contacts and reference numbers. The model gets none of them:
+ * the row's own party names, emails, links and any number of four or more digits are removed first.
+ */
+export function redactDescription(r: Pick<Row, "description" | "importer" | "supplier">): string {
+  let s = (r.description ?? "").toUpperCase().replace(/\S+@\S+|HTTPS?:\S+|WWW\.\S+/g, " ");
+  for (const party of [r.importer, r.supplier]) {
+    if (!party) continue;
+    const name = party.toUpperCase().trim();
+    if (name.length >= 4) s = s.split(name).join(" ");
+    const head = cleanName(party).toUpperCase().split(" ").slice(0, 2).join(" ");
+    if (head.length >= 7 && !/^(MENTHOL|NATURAL|STEEL|CHEMICAL)/.test(head)) s = s.split(head).join(" ");
+  }
+  return s.replace(/\b[A-Z-]*\d[\d./-]{3,}[A-Z0-9-]*\b/g, " ").replace(/\s+/g, " ").trim().slice(0, 240);
+}
+const DESC_BATCH = 120, DESC_MAX = 840;
 const DescSchema = z.object({ matches: z.array(z.number().int()), reasoning: z.string() });
 
 export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
   const { trace, say } = tracer(ctx);
   const plan = ctx.outputs.plan as Plan;
-  const r = await ctx.call({ source: "customs", endpoint: "export-files", request: { queries: plan.customs_queries } }, async () => runQueries(loadRows(), plan.customs_queries));
+  const source = customsSource();
+  const r = await ctx.call({ source: source.billedAs, endpoint: source.id, request: { source: source.id, queries: plan.customs_queries }, maxUnits: source.maxUnits, credits: (x) => x.units ?? null }, () => source.query(plan.customs_queries));
   const { inMarket, hits } = r.data;
   say("customs", `${plan.customs_queries.length} structured queries on the export files: ${hits.length} matching records of ${inMarket} for ${plan.country.name}`);
   if (!hits.length) {
@@ -80,14 +98,19 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     return { coverage: "none", rows_in_market: inMarket, rows_matched: 0, leads: [], needs_research: true, trace };
   }
   // the model sees only distinct product descriptions: no importer, supplier, value or quantity
-  const descs = [...new Set(hits.filter(h => !isBlank(h.description)).map(h => h.description!.trim()))].slice(0, 120);
+  const described = hits.filter(h => !isBlank(h.description)).map(h => ({ h, text: redactDescription(h) })).filter(x => x.text.length > 2);
+  const all = [...new Set(described.map(x => x.text))];
+  const descs = all.slice(0, DESC_MAX);
+  if (all.length > descs.length) say("customs", `${all.length - descs.length} descriptions were not read: over the ${DESC_MAX} limit, so those records stay category-only`);
   const exact = new Set<string>();
-  if (descs.length) {
-    const j = await askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 1500,
+  for (let at = 0; at < descs.length; at += DESC_BATCH) {
+    const batch = descs.slice(at, at + DESC_BATCH);
+    const j = await askJson(ctx, { agent: "customs-matcher", schema: DescSchema, maxOut: 3000,
       task: `You decide which shipment descriptions are this exact product. A description that only fits the broad HS heading is not a match. Return {"matches":[indexes of exact matches], "reasoning": one sentence}.`,
-      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: descs.map((text, index) => ({ index, text })) } });
-    for (const i of j.matches) if (descs[i] !== undefined) exact.add(descs[i]);
-    say("customs", `${exact.size} of ${descs.length} descriptions are the exact product: ${j.reasoning}`);
+      data: { product: plan.product_spec, include: plan.include_terms, exclude: plan.exclude_terms, descriptions: batch.map((text, index) => ({ index, text })) } });
+    let n = 0;
+    for (const i of new Set(j.matches)) if (batch[i] !== undefined) { exact.add(batch[i]); n++; }
+    say("customs", `${n} of descriptions ${at + 1} to ${at + batch.length} are the exact product: ${j.reasoning}`);
   }
   if (!descs.length) say("customs", "Every description in this export is blank or 'Other', so none can prove the exact product. The detailed product report is needed.");
   const groups = new Map<string, Row[]>();
@@ -98,7 +121,7 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
   }
   const leads: Lead[] = [];
   for (const rows of groups.values()) {
-    const matched = rows.filter(x => x.description && exact.has(x.description.trim()));
+    const matched = rows.filter(x => !isBlank(x.description) && exact.has(redactDescription(x)));
     const used = matched.length ? matched : rows;
     const b = behaviourOf(used);
     const score = Math.round((matched.length ? 45 : 20) + Math.min(20, 5 * Math.log2(1 + used.length)) + Math.min(20, b.months_active * 4)
@@ -110,7 +133,7 @@ export async function customsStep(ctx: StepCtx): Promise<CustomsOutput> {
     const first = used[0];
     const text = matched.length ? `Imported this product: ${used.length} record(s), ${b.first_month} to ${b.last_month}` : `Imported under HS ${lead.hs_codes.join(", ")}: ${used.length} record(s). The product is not confirmed`;
     lead.claims.push({ id: hashOf([lead.lead_id, "customs"]).slice(0, 10), lead_id: lead.lead_id, text, kind: "customs",
-      quote: first.description ?? `HS ${first.hs}`, source_url: null, record_id: `${first.file}:${first.line}`, retrieved_at: r.retrieved_at,
+      quote: first.description ? redactDescription(first) : `HS ${first.hs}`, source_url: null, record_id: `${first.file}:${first.line}`, retrieved_at: r.retrieved_at,
       verdict: "accepted", verdict_reason: "computed by code from the export records", shareable: false });
     if (!matched.length) lead.needs_person.push("product not identified in the record: request the detailed product report");
     leads.push(lead);

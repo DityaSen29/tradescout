@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Ledger } from "../src/ledger/ledger.js";
 import { runPipeline } from "../src/runner/pipeline.js";
 import { checkDraft, draftHash } from "../src/buyer/write.js";
-import { behaviourOf, isBlank, isBuyerName, runQueries, type Row } from "../src/buyer/customs.js";
+import { behaviourOf, isBlank, isBuyerName, redactDescription, runQueries, type Row } from "../src/buyer/customs.js";
 import { quoteInSource, sourceAboutCompany } from "../src/buyer/common.js";
 import { nameMatch } from "../src/buyer/contacts.js";
 import { onDoNotContact, selectStep } from "../src/buyer/select.js";
@@ -44,6 +44,10 @@ describe("customs route", () => {
   it("knows blank descriptions and non-buyers", () => {
     expect(["OTHER", "NULL", null].every(isBlank)).toBe(true);
     expect(["TO ORDER", "Example Freight Forwarders"].some(isBuyerName)).toBe(false);
+  });
+  it("redacts parties, contacts and references before a model reads a description", () => {
+    const d = redactDescription(row({ importer: "Example Importer", description: "NATURAL MENTHOL CRYSTALS 25 KG PO 4500123456 EXAMPLE IMPORTER a.b@example.com" }));
+    expect(d).toBe("NATURAL MENTHOL CRYSTALS 25 KG PO");
   });
   it("runs a typed query", () => {
     const q = [{ hs_prefix: "730890", destination_iso3: "USA", include_terms: [], exclude_terms: [], group_by: "importer" as const, measures: [] }];
