@@ -40,7 +40,7 @@ export async function vetStep(ctx: StepCtx): Promise<VetOutput> {
   for (const cand of search.candidates) {
     const rec = records.get(cand.company_id);
     const sanctions = screen(cand.name);
-    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest entry ${sanctions.near.name} at ${sanctions.near.score}, below the ${92} threshold, listed for a person)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
+    const sanctionsEvidence = { claim: sanctions.hit ? `${cand.name} matches ${sanctions.list} entry "${sanctions.name}" (score ${sanctions.score})` : !sanctions.checked_lists.length ? `${cand.name} not screened: no sanctions list is loaded` : `${cand.name} not found on ${sanctions.checked_lists.join(", ")}${sanctions.near ? ` (nearest entry ${sanctions.near.name} at ${sanctions.near.score}, below the ${92} threshold, listed for a person)` : ""}`, source_type: "sanctions" as const, source_url: sanctions.hit && sanctions.list === "UN consolidated" ? SANCTIONS_SOURCES.UN : SANCTIONS_SOURCES.OFAC, record_id: sanctions.name, field: "name", record_date: null, retrieved_at };
     let adverse: number | null = null;
     if (rec) {
       const c = rec.c;

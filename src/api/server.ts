@@ -4,7 +4,8 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { extname, join, normalize } from "node:path";
 import { Ledger } from "../ledger/ledger.js";
 import { runPipeline } from "../runner/pipeline.js";
-import { buildPipeline } from "../pipeline.js";
+import { buildBuyerPipeline as buildPipeline } from "../buyer/pipeline.js";
+import { MAX_SELECTED } from "../buyer/select.js";
 import { RequestSchema } from "../core/types.js";
 import { emit, subscribe, history } from "./events.js";
 import { executeApproved } from "../actions/execute.js";
@@ -74,7 +75,10 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)$/)) && m === "GET") {
       const id = mm[1]; const run = ledger.getRun(id); if (!run) return json(res, 404, { error: "no such run" });
       const report = ledger.stepOutput<any>(id, "report")?.output ?? null;
-      return json(res, 200, { run, steps: ledger.listSteps(id), totals: ledger.totals(id), actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
+      const shortlist = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
+      const trace = ["plan", "customs", "research", "shortlist", "contacts", "write"].flatMap(s => ledger.stepOutput<any>(id, s)?.output?.trace ?? []);
+      const plan = ledger.stepOutput<any>(id, "plan")?.output ?? null;
+      return json(res, 200, { shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: ledger.totals(id), actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
@@ -89,7 +93,17 @@ const server = createServer(async (req, res) => {
       req.on("close", () => { closed = true; unsub(); }); return;
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/resume$/)) && m === "POST") { const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" }); start(id, "resume"); return json(res, 202, { run_id: id, resumed: true }); }
-    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "search", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "search" }); }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/select$/)) && m === "POST") {
+      const id = mm[1];
+      if (running.has(id)) return json(res, 409, { error: "the run is still working" });
+      const leads: any[] = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
+      const ids = (await readBody(req)).lead_ids;
+      if (!Array.isArray(ids) || !ids.length || ids.length > MAX_SELECTED || !ids.every(x => leads.some(l => l.lead_id === x))) return json(res, 400, { error: `pick 1 to ${MAX_SELECTED} companies from the shortlist` });
+      ledger.setSelection(id, ids);
+      start(id, "resume");
+      return json(res, 202, { run_id: id, selected: ids.length });
+    }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "research", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "research" }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/ledger$/)) && m === "GET") return json(res, 200, { calls: ledger.listCalls(mm[1]), totals: ledger.totals(mm[1]), run: ledger.getRun(mm[1]) });
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/evidence$/)) && m === "GET") return json(res, 200, ledger.listEvidence(mm[1]));
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/record$/)) && m === "GET") {

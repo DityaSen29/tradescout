@@ -58,12 +58,16 @@ export class Crustdata {
     if (p.ids) body.crustdata_company_ids = p.ids.slice(0, 25);
     return this.records("/company/enrich", body, ["companies", "items"], true);
   }
-  companyIdentify(p: { name?: string; domain?: string; domains?: string[] }) {
+  companyIdentify(p: { name?: string; names?: string[]; domain?: string; domains?: string[] }) {
     const body: any = {};
     if (p.domains) body.domains = p.domains; else if (p.domain) body.domains = [p.domain];
-    if (p.name) body.name = p.name;
-    return this.request("POST", "/company/identify", body);
+    if (p.names) body.names = p.names; else if (p.name) body.names = [p.name];
+    return this.records("/company/identify", body, ["results"], true);
   }
+  personEnrich(urls: string[]) {
+    return this.records("/person/enrich", { professional_network_profile_urls: urls.slice(0, 25), fields: ["basic_profile.name", "contact.business_emails"] }, ["results"], true);
+  }
+  webFetch(urls: string[]) { return this.records("/web/enrich/live", { urls: urls.slice(0, 10) }, ["results"], true); }
   companyAutocomplete(field: string, query: string) { return this.request("POST", "/company/autocomplete", { field, query }); }
   personSearch(p: { filters: Filter; fields: string[]; limit?: number; query?: string }) {
     const body: any = { filters: p.filters, fields: p.fields, limit: p.limit ?? 10 };
