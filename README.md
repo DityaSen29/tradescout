@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:19 PM IST on 22 November 2026, at commit [`f95a3fd`](https://github.com/shivanshpilani/tradescout/commit/f95a3fd).
+Every capability in this document carries one of these labels. Status is as of 6:23 PM IST on 22 November 2026, at commit [`6a0f5eb`](https://github.com/shivanshpilani/tradescout/commit/6a0f5eb).
 
 | Label | Meaning |
 |---|---|
@@ -137,7 +137,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Ledger, checkpoints and resume | **Live** | A killed live run resumed with no additional credit spend |
 | Hard spend caps | **Live** | Every paid call is held against a cap before it starts |
 | Approval and exactly-once execution | **Built, tested offline** | An approved email is written once to a local file. It is not sent. |
-| Draft editing with critic re-check, batch approve, undo, reject reason, pause-all | **Live through the API, not yet in the redesigned desk** | An edit voids the approval. Batch approval binds to the exact text shown. Pause-all blocks execution. |
+| Draft editing with critic re-check, batch approve, undo, reject reason, pause-all | **Live through the API, wired into the redesigned desk** | An edit voids the approval. Batch approval binds to the exact text shown. Pause-all blocks execution. |
 | Step costs and typed failure states | **Live through the API, not yet in the redesigned desk** | Cost and share per step, and whether a failed run can resume |
 | Don't-contact list | **Built, tested offline** | Checked at shortlist and again before writing |
 | Swappable customs source | **Built** | Only the file adapter exists. No vendor API is connected. |
@@ -146,7 +146,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Zoho, Salesforce, Pipedrive and other CRMs | **Coming soon** | Only HubSpot is offered. Zoho adapter code exists but has only met a simulator. |
 | Gmail outreach, follow-ups, reply triage and alerts | **Built, simulated** | Wired into this branch and tested on a simulated mailbox. It can email only listed team test inboxes. No real send is claimed. |
 | Exclude the exporter's existing buyers, rank related parties last | **Built, tested offline** | Needs the exporter's company name in the brief |
-| Redesigned "Agent rail" interface | **Built, partly on example data** | Served at `/desk.html`. Segments, sending rules and features not yet wired to the API show example data. |
+| Redesigned "Agent rail" interface | **Built, partly on example data** | Served at `/desk.html`. It sends the exporter's name and is wired to live runs and the approval actions. Segments and sending rules show example data. |
 | Public Vercel prototype | **Simulated** | The [public prototype](https://meridian-buyer-desk.vercel.app) uses simulated example data and is not evidence of a live run |
 | Buyer intelligence | **Roadmap: Feature 2** | Shown as coming next |
 | Automated named-company route | **Roadmap** | Sold manually today |
@@ -199,7 +199,7 @@ The origin reading, added at 6:08 PM, ran live through planning and customs for 
 
 ### How we tested it
 
-On a fresh clone at `f95a3fd`, with Node 22.14:
+On a fresh clone at `6a0f5eb`, with Node 22.14:
 
 - **235 automated tests in twelve files pass**, with a one-line stand-in for one public OFAC reference file that isn't bundled (see the [run instructions](#tests)). They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
 - **The TypeScript type check passes.**
