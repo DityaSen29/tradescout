@@ -30,16 +30,16 @@ export function linkSimilar(g: MemoryGraph, companyIds: string[]) {
   const sets = new Map<string, Set<string>>();
   for (const id of companyIds) {
     const s = new Set<string>();
+    // Similarity is about what a company does, not where it is: keywords and industries only, never the country.
     for (const e of g.edgesFrom(id, "MATCHES")) s.add(e.to);
-    for (const e of g.edgesFrom(id, "LOCATED_IN")) s.add(e.to);
     const n = g.nodes.get(id); for (const ind of ((n?.props.industries as string[]) ?? [])) s.add(`ind:${ind}`);
     sets.set(id, s);
   }
   for (let i = 0; i < companyIds.length; i++) for (let j = i + 1; j < companyIds.length; j++) {
     const a = sets.get(companyIds[i])!, b = sets.get(companyIds[j])!;
     let inter = 0; for (const x of a) if (b.has(x)) inter++;
-    const w = inter / Math.max(1, Math.min(a.size, b.size));
-    if (w >= 0.34) { g.upsertEdge({ from: companyIds[i], to: companyIds[j], type: "SIMILAR_TO", props: { weight: Number(w.toFixed(2)) } }); g.upsertEdge({ from: companyIds[j], to: companyIds[i], type: "SIMILAR_TO", props: { weight: Number(w.toFixed(2)) } }); }
+    const w = a.size && b.size ? (2 * inter) / (a.size + b.size) : 0;   // Dice over shared keywords and industries
+    if (inter >= 2 && w >= 0.5) { g.upsertEdge({ from: companyIds[i], to: companyIds[j], type: "SIMILAR_TO", props: { weight: Number(w.toFixed(2)) } }); g.upsertEdge({ from: companyIds[j], to: companyIds[i], type: "SIMILAR_TO", props: { weight: Number(w.toFixed(2)) } }); }
   }
 }
 
