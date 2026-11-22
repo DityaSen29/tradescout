@@ -1,0 +1,27 @@
+{
+  "name": "tradescout",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TradeScout: an export sourcing desk. Product and market in; cited market signal, vetted counterparties with a trust tier, the right contact and an approval-gated draft out.",
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "run": "tsx src/cli.ts run",
+    "resume": "tsx src/cli.ts resume",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "api": "tsx src/api/server.ts"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@types/node": "^26.6.6",
+    "neo4j-driver": "^6.3.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1",
+    "zod": "^4.6.7"
+  }
+}
