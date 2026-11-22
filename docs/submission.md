@@ -33,7 +33,7 @@ Every call is in a ledger with hard per-run and daily caps. A killed run resumes
 
 **Not live:** HubSpot sync is tested on a simulator. Gmail outreach and alerts are built and tested offline, limited to team test inboxes, and no email was sent to any buyer. Vendor customs APIs are an interface only. Buyer intelligence is Feature 2.
 
-**Where it needs a person:** selecting companies, importer names that don't resolve (often 2 to 5 of every 5 in our menthol runs), blocked drafts, every approval, and any action with an unknown outcome.
+**Where it needs a person:** selecting companies, importer names that can't be confirmed as the same company, blocked drafts, every approval, and any action with an unknown outcome.
 
 **Approaches considered:** rules only (our morning build: it ranked steel distributors as grating buyers), one prompt (no proof), free-running agents (no bound on cost or actions), and the chosen hybrid of agents inside a durable, capped workflow.
 
