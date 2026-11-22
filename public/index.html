@@ -3,102 +3,52 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>TradeScout desk</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/style.css">
+<title>Meridian buyer desk</title>
+<style>
+:root{--ink:#17202b;--muted:#5c6773;--line:#d9dee3;--bg:#f6f7f8;--panel:#fff;--accent:#175cd3}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,sans-serif}
+header{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+main{display:grid;grid-template-columns:260px minmax(0,1fr) 340px;gap:16px;padding:16px}
+@media(max-width:1000px){main{grid-template-columns:minmax(0,1fr)}}
+section{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px;margin-bottom:12px}
+h1{font-size:16px;margin:0}h2{font-size:14px;margin:0 0 8px}
+label{display:block;margin-bottom:8px;color:var(--muted)}
+input,textarea{display:block;width:100%;font:inherit;padding:6px;border:1px solid var(--line);border-radius:4px}
+input[type=checkbox]{display:inline;width:auto}
+button{font:inherit;padding:6px 10px;border:1px solid var(--accent);border-radius:4px;background:var(--accent);color:#fff;cursor:pointer}
+button.quiet{background:transparent;color:var(--accent)}button:disabled{opacity:.5}
+.muted{color:var(--muted)}.row{padding:8px 0;border-top:1px solid var(--line);overflow-wrap:anywhere}
+#trace{max-height:340px;overflow:auto}#trace b{display:inline-block;min-width:96px}
+.body{white-space:pre-wrap}.locked{border-style:dashed}
+</style>
 </head>
 <body>
-<header class="masthead">
-  <h1>TradeScout</h1>
-  <p class="tag">An export sourcing desk. Product and market in; vetted counterparties, the right buyer and a draft out. Every line carries its source.</p>
-  <div class="masthead-right"><span id="api-state" class="pill">connecting</span></div>
-</header>
-
-<main class="desk">
-  <aside class="intake">
-    <form id="request-form">
-      <h2>New request</h2>
-      <label>What do you export?<input name="product" required placeholder="industrial textiles" autocomplete="off"></label>
-      <label>Which market?<input name="target_country" required placeholder="Germany, DEU, the UAE" autocomplete="off"></label>
-      <div class="two">
-        <label>Min staff<input name="min_headcount" type="number" value="20" min="1"></label>
-        <label>Max staff<input name="max_headcount" type="number" value="2000" min="1"></label>
-      </div>
-      <label>HS code, if you already know it<input name="hs_code" placeholder="5911" pattern="\d{4,6}" autocomplete="off"></label>
-      <button type="submit" class="primary">Run the desk</button>
-      <p class="hint">About 20 to 30 Crustdata credits per run. Nothing is sent to anyone; drafts wait for your approval.</p>
-    </form>
-    <section class="runs">
-      <h2>Runs</h2>
-      <ul id="run-list"></ul>
+<header><h1>Meridian buyer desk</h1><div><span id="status" class="muted"></span> · <span id="cost" class="muted"></span> · Approval mode</div></header>
+<main>
+  <div>
+    <section><h2>Brief</h2>
+      <form id="brief">
+        <label>Exact product<input name="product" required></label>
+        <label>HSN, if known<input name="hs_code" pattern="\d{4,8}"></label>
+        <label>Market<input name="target_country" required></label>
+        <label>Your offer, quotable in emails<textarea name="notes" rows="3" maxlength="1000"></textarea></label>
+        <label>Don't contact: customers, agents, distributors, one per line<textarea name="do_not_contact" rows="3"></textarea></label>
+        <button>Start agents</button>
+      </form>
     </section>
-  </aside>
-
-  <section class="sheet" id="sheet" hidden>
-    <div class="sheet-head">
-      <div>
-        <p class="request-line" id="request-line"></p>
-        <p class="resolved" id="resolved"></p>
-      </div>
-      <div class="controls">
-        <span id="run-status" class="pill"></span>
-        <button id="resume-btn" class="ghost" hidden>Resume run</button>
-        <button id="rerun-btn" class="ghost" hidden>Run again (diff)</button>
-      </div>
-    </div>
-
-    <section class="ask" id="ask" hidden></section>
-    <ol class="steps" id="steps"></ol>
-
-    <div class="columns">
-      <div class="main">
-        <section id="layers" class="layers"></section>
-        <section>
-          <h2 id="shortlist-title">Shortlist</h2>
-          <div id="shortlist"></div>
-        </section>
-        <section id="needs-person" class="needs-person"></section>
-      </div>
-      <aside class="rail">
-        <section class="ledger">
-          <h2>Run ledger</h2>
-          <dl id="ledger"></dl>
-          <details><summary>Every call</summary><table id="calls"></table></details>
-        </section>
-        <section class="actions">
-          <h2>Awaiting your approval</h2>
-          <div id="actions"></div>
-        </section>
-        <section class="graph" id="graph"></section>
-        <section class="monitor" id="monitor"></section>
-      </aside>
-    </div>
-  </section>
-
-  <section class="empty" id="empty">
-    <h2>Pick a run on the left, or start one.</h2>
-    <p>The desk works in seven steps: read the request, find counterparties, vet them, read buying signals, find the buyer, draft the first note, and write the report. Each step is a checkpoint; kill the process at any point and resume it, and nothing is paid or proposed twice.</p>
-  </section>
+    <section><h2>Runs</h2><div id="runs"></div></section>
+    <section class="locked"><h2>Buyer intelligence</h2><p class="muted">Feature 2, coming next: reorder rhythm, next buying window, share of wallet and supplier switching.</p></section>
+  </div>
+  <div>
+    <section><h2>Agents</h2><div id="trace" aria-live="polite"></div></section>
+    <section><h2>Shortlist</h2><div id="shortlist"></div><button id="select" hidden>Enrich and draft for selected</button> <button id="resume" class="quiet" hidden>Resume</button></section>
+  </div>
+  <div>
+    <section><h2>Waiting for your approval</h2><div id="drafts"></div></section>
+    <section><h2>Every call</h2><div id="calls" class="muted"></div></section>
+  </div>
 </main>
-
-<template id="candidate-row">
-  <article class="row">
-    <div class="rank"></div>
-    <div class="who">
-      <h3 class="name"></h3>
-      <p class="meta"></p>
-      <p class="why"></p>
-      <p class="contact"></p>
-      <details class="evidence"><summary></summary><ul></ul></details>
-    </div>
-    <div class="scores">
-      <div class="stamp"></div>
-      <div class="fit"><span class="bar"><i></i></span><span class="num"></span></div>
-      <p class="intent"></p>
-    </div>
-  </article>
-</template>
 <script src="/app.js"></script>
 </body>
 </html>

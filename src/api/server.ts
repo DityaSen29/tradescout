@@ -7,7 +7,9 @@ import { runPipeline } from "../runner/pipeline.js";
 import { buildBuyerPipeline as buildPipeline } from "../buyer/pipeline.js";
 import { MAX_SELECTED } from "../buyer/select.js";
 import { RequestSchema } from "../core/types.js";
-import { emit, subscribe, history } from "./events.js";
+import { emit, reopen, subscribe, history } from "./events.js";
+import { STAGES } from "../buyer/contract.js";
+import { createCrmRouter, crmFor, startPolling, syncLeads } from "../crm/index.js";
 import { executeApproved } from "../actions/execute.js";
 
 /**
@@ -28,15 +30,31 @@ const PORT = Number(process.env.PORT ?? 8787);
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"].map(h => `${h}:${PORT}`));
 const ledger = new Ledger();
 const running = new Set<string>();
+const crm = createCrmRouter(crmFor(ledger));
+if (process.env.HUBSPOT_TOKEN) startPolling(crmFor(ledger));
+
+const MODULES = [
+  { id: "buyer_desk", name: "Find, prove and approach buyers", status: "live" },
+  { id: "crm_sync", name: "Two-way CRM sync", status: process.env.HUBSPOT_TOKEN ? "live" : "needs_connection" },
+  { id: "outreach", name: "Campaign runner, mailbox health and alerts", status: "building" },
+  { id: "buyer_intelligence", name: "Buyer intelligence", status: "coming_next", label: "Feature 2", description: "Reorder rhythm, next buying window, share of wallet and supplier switching, from import records" },
+];
+/** Rupees are estimates: set the two rates from your own invoices. */
+function costOf(t: { credits_used: number; model_cost_usd: number }) {
+  return { estimated_inr: Number((t.credits_used * Number(process.env.INR_PER_CRUSTDATA_CREDIT ?? 0.83) + t.model_cost_usd * Number(process.env.INR_PER_USD ?? 90)).toFixed(2)) };
+}
 
 function start(runId: string, mode: "run" | "resume") {
   if (running.has(runId)) return;
   running.add(runId);
-  if (mode === "resume") process.env.TRADESCOUT_KILLED = "1";
+  if (mode === "resume") { process.env.TRADESCOUT_KILLED = "1"; reopen(runId); }
   runPipeline(ledger, runId, buildPipeline(), {
-    log: (m) => emit(runId, { type: "log", message: m }),
+    log: (m) => {
+      const a = m.match(/^agent:([\w-]+): ([\s\S]*)$/);
+      emit(runId, a ? { type: "agent", agent: a[1], message: a[2] } : { type: "log", message: m });
+    },
     onStep: (name, status, info) => emit(runId, { type: "step", name, status, info: status === "done" ? undefined : info }),
-  }).then(() => emit(runId, { type: "done" }))
+  }).then(() => emit(runId, { type: "done", status: ledger.getRun(runId)?.status }))
     .catch((err) => emit(runId, { type: "error", message: String(err?.message ?? err) }))
     .finally(() => running.delete(runId));
 }
@@ -59,9 +77,11 @@ const server = createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   const p = url.pathname; const m = req.method ?? "GET";
   try {
+    if (await crm(req, res)) return;      // it applies the same local-only guard itself
     // approvals and paid runs are local only: no other site, and no rebound hostname, may drive them
     const origin = req.headers.origin;
     if (!LOCAL_HOSTS.has(req.headers.host ?? "") || (origin && origin !== `http://${req.headers.host}`)) return json(res, 403, { error: "local requests only" });
+    if (p === "/api/modules" && m === "GET") return json(res, 200, { modules: MODULES, stages: STAGES, outreach_mode: "approval" });
     if (p === "/api/limits" && m === "GET") return json(res, 200, ledger.spendToday());
     if (p === "/api/health") return json(res, 200, { ok: true, running: [...running], time: new Date().toISOString() });
     if (p === "/api/runs" && m === "POST") {
@@ -78,7 +98,7 @@ const server = createServer(async (req, res) => {
       const shortlist = ledger.stepOutput<any>(id, "shortlist")?.output?.leads ?? [];
       const trace = ["plan", "customs", "research", "shortlist", "contacts", "write"].flatMap(s => ledger.stepOutput<any>(id, s)?.output?.trace ?? []);
       const plan = ledger.stepOutput<any>(id, "plan")?.output ?? null;
-      return json(res, 200, { shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: ledger.totals(id), actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
+      return json(res, 200, { shortlist, trace, plan, max_selected: MAX_SELECTED, run, steps: ledger.listSteps(id), totals: { ...ledger.totals(id), ...costOf(ledger.totals(id)) }, actions: ledger.listActions(id), report, running: running.has(id), events: history(id).length });
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/events$/)) && m === "GET") {
       const id = mm[1]; if (!ledger.getRun(id)) return json(res, 404, { error: "no such run" });
@@ -102,6 +122,11 @@ const server = createServer(async (req, res) => {
       ledger.setSelection(id, ids);
       start(id, "resume");
       return json(res, 202, { run_id: id, selected: ids.length });
+    }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/sync$/)) && m === "POST") {
+      const leads = ledger.stepOutput<any>(mm[1], "report")?.output?.leads?.filter((l: any) => l.selected);
+      if (!leads?.length) return json(res, 409, { error: "nothing to sync until the selected companies are enriched" });
+      return json(res, 200, await syncLeads(ledger, mm[1], leads));
     }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "research", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "research" }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/ledger$/)) && m === "GET") return json(res, 200, { calls: ledger.listCalls(mm[1]), totals: ledger.totals(mm[1]), run: ledger.getRun(mm[1]) });

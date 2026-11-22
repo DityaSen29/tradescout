@@ -13,7 +13,7 @@ const words = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\
 export const searchName = (name: string) => words(name).slice(0, 4).join(" ");
 /** Dice over the distinctive words of two company names. */
 export function nameMatch(a: string, b: string, market = ""): number {
-  const skip = new Set(words(market));       // "Ambacar Ecuador" is AMBACAR in Ecuador
+  const skip = new Set(words(market));       // "Acme Ecuador" is ACME in Ecuador
   const keep = (s: string) => new Set(words(s).filter(w => !skip.has(w)));
   const x = keep(a), y = keep(b);
   if (!x.size || !y.size) return 0;

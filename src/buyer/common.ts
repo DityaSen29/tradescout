@@ -28,7 +28,7 @@ export function sourceAboutCompany(src: { url: string | null; text: string }, co
   if (host && dom && (host === dom || host.endsWith(`.${dom}`))) return true;
   const name = cleanName(company.name);
   if (name.length >= 5 && ` ${cleanName(src.text)} `.includes(` ${name} `)) return true;
-  // pages write "Alkun Steel" for "Al Kun Steel trd", and search links can be redirects
+  // pages write "Example Steel" for "Ex Ample Steel trd", and search links can be redirects
   const flat = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
   const body = flat(src.text), short = flat(company.name.replace(/\b(trading|trd|est|establishment|llc|l\.l\.c\.?|fze|fzc|fzco|co|company|ltd|limited|international|group|inc)\b\.?/gi, " "));
   const label = flat(dom?.split(".")[0] ?? "");
