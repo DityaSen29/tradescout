@@ -59,15 +59,18 @@ export async function contactsStep(ctx: StepCtx): Promise<{ leads: Lead[]; trace
     if (names.length) try {
       const found: ReturnType<typeof flattenCompany>[] = [];
       // one search per name: a shared search lets one common word crowd the others out of the result
-      for (const name of names) try {
+      const searches = await Promise.allSettled(names.map(async name => {
       const r = await ctx.call({ source: "crustdata", endpoint: "/company/search", request: { iso, name, limit, about: plan.company_search }, maxUnits: limit * 0.03, credits: (x: any) => x.credits }, async () => {
         const x = await crust().companySearch({ filters: and(f("locations.country", "=", iso), f("basic_info.name", "[.]", name)), query: plan.company_search, mode: "hybrid", fields: ["basic_info.name", "basic_info.primary_domain", "basic_info.description", "crustdata_company_id"], limit });
         return { companies: x.data.companies as any[], credits: x.credits };
       });
-      found.push(...r.data.companies.map(flattenCompany).filter(c => c.name && c.company_id));
-      } catch (err: any) {
-        if (err instanceof BudgetExceeded) throw err;
-        say("enrichment", `Lookup of "${name}" failed (${String(err?.message ?? err).slice(0, 80)}). The other names continue.`);
+        return r.data.companies;
+      }));
+      // every search has settled before anything can fail the step, so a resume never repeats a paid call still in flight
+      for (const [i, r] of searches.entries()) {
+        if (r.status === "fulfilled") found.push(...r.value.map(flattenCompany).filter(c => c.name && c.company_id));
+        else if (r.reason instanceof BudgetExceeded) throw r.reason;
+        else say("enrichment", `Lookup of "${names[i]}" failed (${String(r.reason?.message ?? r.reason).slice(0, 80)}). The other names continue.`);
       }
       const namesakes = unresolved.map((l, i) => ({ key: `K${i + 1}`, l,
         options: found.map(c => ({ c, s: nameMatch(c.name!, l.company.name, market) })).filter(x => x.s >= 0.8).sort((x, y) => y.s - x.s).slice(0, 5) }));
