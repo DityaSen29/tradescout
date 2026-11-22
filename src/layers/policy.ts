@@ -29,7 +29,8 @@ export async function policyStep(ctx: StepCtx): Promise<LayerResult<PolicyData>>
     const text = `${it.snippet ?? ""} ${it.title ?? ""}`;
     const m = text.match(/\b([A-Z][a-z]{2})[a-z]*\.? (\d{1,2}), (\d{4})\b/);
     if (m && MONTHS[m[1].toLowerCase()] != null) { const dt = new Date(Date.UTC(Number(m[3]), MONTHS[m[1].toLowerCase()], Number(m[2]))); return { date: dt.toISOString().slice(0, 10), precision: "day" }; }
-    const y = text.match(/\b(20\d{2})\b/); if (y) return { date: y[1], precision: "year" };
+    const ys = [...text.matchAll(/\b(20\d{2})\b/g)].map(m => Number(m[1])).filter(v => v <= year && v >= year - 1);   // a publication year cannot be in the future
+    if (ys.length) return { date: String(Math.max(...ys)), precision: "year" };
     return { date: null, precision: null };
   };
   const sinceYear = year - 1;
