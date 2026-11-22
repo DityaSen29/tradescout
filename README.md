@@ -2,7 +2,7 @@
 
 **Meridian drives revenue for export businesses via distribution intelligence.**
 
-*An agentic export sales desk for Indian manufacturers, built at ContextCon 05 (Crustdata × Y Combinator, BITS Pilani, 22 November 2026).*
+*An agentic export sales desk for export businesses, built at ContextCon 05 (Crustdata × Y Combinator, BITS Pilani, 22 November 2026).*
 
 Give it a product, an HSN code and a target country. It finds companies abroad that import or use that exact product, shows the evidence for each one, waits for you to choose, finds the person who decides and their work email, writes an email from that buyer's evidence, checks it, and waits for your approval.
 
@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 5:57 PM IST on 22 November 2026, at commit [`7ff3c31`](https://github.com/shivanshpilani/tradescout/commit/7ff3c31).
+Every capability in this document carries one of these labels. Status is as of 6:08 PM IST on 22 November 2026, at commit [`874d2d7`](https://github.com/shivanshpilani/tradescout/commit/874d2d7).
 
 | Label | Meaning |
 |---|---|
@@ -32,7 +32,7 @@ In short: **the agents, Crustdata, the customs-file route, the ledger and the ca
 
 Imagine applying for a PhD abroad without knowing which labs have funding, which professor decides, or whether they work on your topic. You could write to 500 professors and hear nothing, or spend weeks researching ten.
 
-That is export sales for an Indian manufacturer. The factory can make the product. What it doesn't know is:
+That is export sales for manufacturers around the world. A factory can make the product. What it doesn't know is:
 
 1. **Who abroad buys this exact product**, and not merely something in the same category?
 2. **Is there proof?** A company website saying "chemicals" doesn't show that the company buys menthol crystals.
@@ -65,7 +65,7 @@ Every step needs a different tool and some judgement. Repeat it for every buyer,
 | What exporters use today | What they get | What is missing |
 |---|---|---|
 | Export agent or buying house | A person who brings enquiries, paid by commission | The exporter doesn't see the research or own the pipeline |
-| Export consultant | A market report, from about ₹50,000, in two to three weeks | A report doesn't write to anyone |
+| Export consultant | A one-off market report | A report doesn't write to anyone |
 | Trade-data subscription | Shipment rows to search | Someone still has to judge fit, find the person and write |
 | B2B portal | Inbound enquiries shared among many sellers | Many are price comparisons |
 | Contact database | Names and emails | No proof that the company buys this product |
@@ -75,7 +75,7 @@ Every step needs a different tool and some judgement. Repeat it for every buyer,
 
 ### Who pays
 
-- **Customer:** an Indian manufacturer of a product that can be specified (chemicals, ingredients, engineering parts, steel, packaging) that wants to sell directly to users and distributors abroad.
+- **Customer:** a manufacturer or export business with a product that can be specified (chemicals, ingredients, engineering parts, steel, packaging) that wants to sell directly to users and distributors abroad.
 - **Champion:** the export or business-development manager.
 - **Signs:** the owner or director.
 - **When they buy:** a trade fair, a new target market, or a wish list of accounts that has stalled.
@@ -151,7 +151,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 
 ### One request, from start to finish
 
-> "We make natural menthol crystals in India. HSN 2906.11. Find buyers in the United States. Don't contact our existing distributor."
+> "We make natural menthol crystals. HSN 2906.11. Find buyers in the United States. Don't contact our existing distributor."
 
 1. **Plan.** The planner writes down what exactly qualifies, what looks similar but doesn't, who tends to buy it and who doesn't (for example, competing makers and freight forwarders). It expands the HS codes importers might declare it under. Code drops any code that isn't in the official list.
 2. **Query customs.** The plan becomes typed queries that code runs on the shipment records. The model never writes SQL.
@@ -190,6 +190,10 @@ These results were recorded by the team during the build. The run databases hold
 | Customs route through to checked drafts, US menthol | One run cost 12.5 credits and $0.026 of model spend | The customs route also reaches an approval-ready draft |
 | Kill after paid calls, then resume | 15.95 credits before and 15.95 after | Resume didn't pay again |
 
+A non-menthol product, stainless hose clamps in Australia, also ran live on the research route. With no customs data, the researcher searched and read pages, and the critic accepted three buyers with quotes, for 5.8 credits.
+
+The redesigned desk doesn't send the exporter's company name yet, so automatic exclusion of existing buyers works from the minimal interface, the API and the command line. On the redesigned desk, list existing customers by hand. Its segments, draft editing with re-check, batch approve, pause-all, per-segment figures, per-country send rules, and website and named-company searches are example data.
+
 The menthol runs also exposed real weaknesses:
 
 | What went wrong | Where it stands |
@@ -201,7 +205,7 @@ The menthol runs also exposed real weaknesses:
 
 ### How we tested it
 
-On a fresh clone at `7ff3c31`, with Node 22.14:
+On a fresh clone at `874d2d7`, with Node 22.14:
 
 - **220 automated tests in nine files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, CRM sync and outreach.
 - **As shipped, 219 of 220 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 220 of 220 pass. The [run instructions](#tests) cover the real file.
