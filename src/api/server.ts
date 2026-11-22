@@ -88,7 +88,7 @@ const server = createServer(async (req, res) => {
     if (m === "GET") {
       const rel = p === "/" ? "/index.html" : p;
       const file = normalize(join("public", rel));
-      if (file.startsWith("public") && existsSync(file)) { res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream" }); return res.end(readFileSync(file)); }
+      if (file.startsWith("public") && existsSync(file)) { res.writeHead(200, { "content-type": MIME[extname(file)] ?? "application/octet-stream", "cache-control": "no-store" }); return res.end(readFileSync(file)); }
     }
     json(res, 404, { error: "not found" });
   } catch (err: any) {
