@@ -41,7 +41,7 @@ if (emailTestMode) startWorker(outreach);
 
 const MODULES = [
   { id: "buyer_desk", name: "Find, prove and approach buyers", status: "live" },
-  { id: "crm_sync", name: "Two-way CRM sync", status: process.env.HUBSPOT_TOKEN ? "live" : "needs_connection" },
+  { id: "crm_sync", name: "Two-way CRM sync", status: crmFor(ledger).configured() ? "configured" : "needs_connection" },
   { id: "outreach", name: "Campaign runner, mailbox health and alerts", status: emailTestMode ? "test_inboxes_only" : "needs_connection" },
   { id: "buyer_intelligence", name: "Buyer intelligence", status: "coming_next", label: "Feature 2", description: "Reorder rhythm, next buying window, share of wallet and supplier switching, from import records" },
 ];
