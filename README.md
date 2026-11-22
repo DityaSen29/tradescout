@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:08 PM IST on 22 November 2026, at commit [`874d2d7`](https://github.com/shivanshpilani/tradescout/commit/874d2d7).
+Every capability in this document carries one of these labels. Status is as of 6:12 PM IST on 22 November 2026, at commit [`76518a6`](https://github.com/shivanshpilani/tradescout/commit/76518a6).
 
 | Label | Meaning |
 |---|---|
@@ -125,6 +125,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Capability | Status | Detail |
 |---|---|---|
 | Planner agent: product specification and HS expansion | **Live** | Every proposed code is checked against the official HS 2022 list |
+| Exporter's origin read from its own brief | **Live for planning and customs ranking. Emails tested offline.** | The stated country, or the quoted words that show it, drive ranking and the seller's claim in emails. No finished email for a non-Indian seller has been run live. |
 | Customs route from export files | **Live** | The demo uses US menthol import data, loaded locally |
 | Customs matcher: exact product or category only | **Live** | Reads shipment descriptions after redaction |
 | Researcher agent for markets without customs data | **Live** | Chooses its own Crustdata searches and reads pages |
@@ -153,7 +154,7 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 
 > "We make natural menthol crystals. HSN 2906.11. Find buyers in the United States. Don't contact our existing distributor."
 
-1. **Plan.** The planner writes down what exactly qualifies, what looks similar but doesn't, who tends to buy it and who doesn't (for example, competing makers and freight forwarders). It expands the HS codes importers might declare it under. Code drops any code that isn't in the official list.
+1. **Plan.** The planner writes down what exactly qualifies, what looks similar but doesn't, who tends to buy it and who doesn't (for example, competing makers and freight forwarders). It expands the HS codes importers might declare it under. Code drops any code that isn't in the official list. It also reads where the exporter ships from. Code accepts that only if the quoted words are in the brief, the country is real and it isn't the target market. If the brief doesn't say, emails state no origin and ranking uses a default.
 2. **Query customs.** The plan becomes typed queries that code runs on the shipment records. The model never writes SQL.
 3. **Prove the product.** An HS code is not a product. The matcher reads distinct shipment descriptions, with known party names, emails, links and long reference numbers removed, and marks those that are the exact product. Code then computes each importer's record count, active months, first and last month, quantity, weight, suppliers and, where value exists, unit price.
 4. **Research where records don't reach.** With fewer than three exact-product importers, including a market with no records at all, the researcher takes over. It chooses among company search, live web search, page reading and company lookup, with a limit on each. The critic can send it back once.
@@ -192,6 +193,8 @@ These results were recorded by the team during the build. The run databases hold
 
 A non-menthol product, stainless hose clamps in Australia, also ran live on the research route. With no customs data, the researcher searched and read pages, and the critic accepted three buyers with quotes, for 5.8 credits.
 
+The origin reading, added at 6:08 PM, ran live through planning and customs for sellers in China, Viet Nam and Uttar Pradesh, and for one brief that stated no origin.
+
 The redesigned desk doesn't send the exporter's company name yet, so automatic exclusion of existing buyers works from the minimal interface, the API and the command line. On the redesigned desk, list existing customers by hand. Its segments, draft editing with re-check, batch approve, pause-all, per-segment figures, per-country send rules, and website and named-company searches are example data.
 
 The menthol runs also exposed real weaknesses:
@@ -205,10 +208,10 @@ The menthol runs also exposed real weaknesses:
 
 ### How we tested it
 
-On a fresh clone at `874d2d7`, with Node 22.14:
+On a fresh clone at `76518a6`, with Node 22.14:
 
-- **220 automated tests in nine files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, CRM sync and outreach.
-- **As shipped, 219 of 220 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 220 of 220 pass. The [run instructions](#tests) cover the real file.
+- **229 automated tests in ten files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
+- **As shipped, 228 of 229 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 229 of 229 pass. The [run instructions](#tests) cover the real file.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
@@ -222,6 +225,7 @@ The tests use stubs for paid services. The live runs above are separate evidence
 |---|---|---|
 | Unknown country | Stops before any paid call | Tested |
 | HS code given by the client doesn't exist | Stops and asks for a correction | In code |
+| Exporter's origin is invented, or is really the target market | Refused, and no email states an origin | Tested |
 | Model invents an HS code | Dropped and logged | In code |
 | One HS code covers several products | Exact product and category are labelled separately | Live |
 | Blank or "Other" shipment description | Category only, flagged to a person | Tested helper, rule in code |
@@ -463,7 +467,7 @@ stateDiagram-v2
 
 | Agent | Receives | May propose | Cannot do | Default model |
 |---|---|---|---|---|
-| Planner | Product, offer, market, close HS entries | Specification, codes, buyer types, search | Use a code that isn't in the official list | `gemini-3.5-flash-lite` |
+| Planner | Product, offer, exporter's name, market, close HS entries | Specification, codes, buyer types, search, exporter's origin | Use a code that isn't in the official list, or an origin the brief doesn't show | `gemini-3.5-flash-lite` |
 | Customs matcher | Product specification and redacted descriptions | Which descriptions are the exact product | See the importer, supplier, value or quantity fields | `gemini-3.5-flash-lite` |
 | Researcher | Plan, its own tool results, critic feedback | The next tool call, then findings with quotes | Send, approve, raise a limit, or open a URL the search didn't return | `gemini-3.6-flash` |
 | Evidence critic | Claim, quote, source text, exclusions | Accept or reject, and a label | Add evidence | `gemini-3.5-flash-lite` |
@@ -567,7 +571,7 @@ The importer accepts export reports and US import manifests in `.xlsx`. It write
 ```bash
 npx tsx src/cli.ts check     # free: credits and endpoint access
 npx tsx src/cli.ts run --product "natural menthol crystals" --country "USA" --hs 290611 \
-  --notes "What you make and can truthfully offer" --client "Your Company Name" --exclude "Existing Distributor Inc"
+  --notes "What you make and can truthfully offer" --client "Your Company Name" --origin "Your Country" --exclude "Existing Distributor Inc"
 npx tsx src/cli.ts select <run-id> 1 2 3
 npx tsx src/cli.ts approve <action-id>
 npx tsx src/cli.ts execute <action-id>    # writes data/out/*.eml and sends nothing
@@ -632,7 +636,7 @@ curl -fsSL -o data/raw/sdn.csv https://sanctionslistservice.ofac.treas.gov/api/d
 ### Data and safety
 
 - **What stays local:** shipment files, the SQLite ledger, drafts and `.env`. All are git-ignored.
-- **What goes to Gemini:** product and plan, redacted shipment descriptions, public web text, company names, records and descriptions, job titles and claims. The app doesn't add contact names, email addresses or customs figures. Redaction follows rules, so an unusual name inside a free-text description could get through, and a public page can itself contain a name.
+- **What goes to Gemini:** product and plan, the exporter's company name and offer, redacted shipment descriptions, public web text, company names, records and descriptions, job titles and claims. The app doesn't add contact names, email addresses or customs figures. Redaction follows rules, so an unusual name inside a free-text description could get through, and a public page can itself contain a name.
 - **What goes to Crustdata:** search words, the names of selected importers to resolve, company IDs and, for work emails, professional profile URLs.
 - **If outreach is connected:** the Gmail token is encrypted and stored outside the repository. Known names, contact details and amounts are redacted from replies before a model call.
 - **Personal data:** name, title, employer and work email, only for selected companies. No phone numbers.
