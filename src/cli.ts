@@ -1,3 +1,5 @@
+import { existsSync } from "node:fs";
+if (existsSync(".env")) { try { process.loadEnvFile(".env"); } catch { /* ignore */ } }
 import { Ledger } from "./ledger/ledger.js";
 import { runPipeline } from "./runner/pipeline.js";
 import { RequestSchema } from "./core/types.js";
