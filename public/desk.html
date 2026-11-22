@@ -113,7 +113,7 @@ dialog .head{align-items:flex-start;flex-wrap:nowrap}dialog h2{font-size:18px;li
 .dlg-act{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .toast{position:fixed;left:16px;bottom:16px;z-index:40;background:var(--ink);color:var(--bg);border-radius:var(--r-btn);padding:11px 14px;display:flex;gap:14px;box-shadow:var(--sh-pop);max-width:calc(100vw - 32px);font-size:var(--small-2)}.toast button{text-decoration:underline;font-weight:600}
 .pop{position:fixed;inset:auto;margin:0;border:0;z-index:50;width:300px;max-width:calc(100vw - 24px);background:var(--card);color:var(--ink);box-shadow:var(--sh-pop);border-radius:var(--r-in);padding:10px 12px;font:var(--small)/1.45 var(--f);white-space:pre-line}
-.top,.tabsb,.mbar,.phead,.cards{display:none}
+.wide table{min-width:980px}.top,.tabsb,.mbar,.phead,.cards{display:none}
 @keyframes spin{to{transform:rotate(360deg)}}@keyframes fade{from{opacity:0}}@keyframes pulse{50%{opacity:.5}}@keyframes pop{from{opacity:0;transform:translateY(6px)}}
 @media(max-width:1279px){:root{--rail:240px;--pad-x:22px}.cols{grid-template-columns:minmax(0,1fr)}.g3.segs{grid-template-columns:repeat(2,minmax(0,1fr))}.appr{grid-template-columns:270px minmax(0,1fr)}}
 @media(max-width:1023px){
@@ -138,25 +138,25 @@ body{font-size:15px}.demo{left:0;transform:none;border-radius:0 0 6px 0}.shell{p
 const QS=new URLSearchParams(location.search),LIVE=QS.get('live')==='1'||(QS.get('live')!=='0'&&['localhost','127.0.0.1'].includes(location.hostname)),DEMO=!LIVE&&QS.get('demo')!=='0';
 if(QS.get('theme')==='dark')document.documentElement.dataset.theme='dark';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const num=n=>Number(n||0).toLocaleString('en-IN'),sum=(a,f)=>a.reduce((t,x)=>t+f(x),0),rs=c=>'₹'+num(Math.round(c*.87)),plural=(n,w,p)=>`${n} ${n===1?w:(p||w+'s')}`;
+const num=n=>Number(n||0).toLocaleString('en-US'),sum=(a,f)=>a.reduce((t,x)=>t+f(x),0),rs=c=>'₹'+num(Math.round(c*.87)),plural=(n,w,p)=>`${n} ${n===1?w:(p||w+'s')}`;
 const ini=s=>String(s||'?').split(' ').map(w=>w[0]).slice(0,2).join('');
-const RECORDS_TO='3 Nov 2026',RETRIEVED='22 Nov 2026, 17:15 IST',STEPS=['Read your product','Confirm product codes','Find who imports it','Pick buyer segments','Match real companies','Find decision makers','Write first emails'];
-const SAMPLE='We make menthol crystals and mint oils in Uttar Pradesh, about 40 tonnes a month, ISO 22000 and FSSAI. Find importers in the United States, Germany and the Netherlands who already buy from India. MOQ 1 tonne.';
+const RECORDS_TO='3 Nov 2026',RETRIEVED='22 Nov 2026, 11:45 UTC',STEPS=['Read your product','Confirm product codes','Find who imports it','Pick buyer segments','Match real companies','Find decision makers','Write first emails'];
+const SAMPLE='We make menthol crystals and mint oils, about 40 tonnes a month, ISO 22000 and FSSC 22000. Find importers in the United States, Germany and the Netherlands who already buy from abroad. MOQ 1 tonne.';
 const CODES=[['2906.11','Menthol','read'],['3301.25','Other mint oils','read'],['3301.24','Peppermint oil','related'],['3302.90','Fragrance mixtures','related']];
-const SHIPPERS=[['UP mint processor A',19],['UP mint processor B',14],['Gujarat exporter C',9],['UP distiller D',7],['Delhi trader E',6],['Maharashtra exporter F',5],['UP distiller G',4],['Haryana processor H',3],['Delhi trader I',2],['UP distiller J',2]];
+const SHIPPERS=[['Mint processor A',19],['Mint processor B',14],['Exporter C',9],['Distiller D',7],['Trader E',6],['Exporter F',5],['Distiller G',4],['Processor H',3],['Trader I',2],['Distiller J',2]];
 const SEGS=[
-{id:'us',name:'Oral care & OTC makers',market:'US',count:62,ship:356,size:'410 t',prop:'Use menthol crystals in toothpaste, rubs and lozenges, mostly landed at Newark.',why:'Reorders moved from quarterly to every two months, and 58% of tonnage comes from India.',crit:['Imports 2906.11 most quarters','5 t or more a year','Makes oral care or OTC products'],hist:{sent:18,replies:3,meet:1,bounce:0,cr:107}},
-{id:'de',name:'Flavour & fragrance houses',market:'DE',count:41,ship:244,size:'$3.1M',prop:'Blend menthol and mint oils for food, fragrance and cosmetics.',why:'Non-Indian supply fell for two quarters, and two buyers posted sourcing roles this month.',crit:['Imports 2906.11 or 3301.25','Flavour, fragrance or cosmetic industry','Bought from India in the last 12 months'],hist:{sent:12,replies:1,meet:0,bounce:0,cr:74}},
+{id:'us',name:'Oral care & OTC makers',market:'US',count:62,ship:356,size:'410 t',prop:'Use menthol crystals in toothpaste, rubs and lozenges, mostly landed at Newark.',why:'Reorders moved from quarterly to every two months, and 58% of tonnage comes from your origin.',crit:['Imports 2906.11 most quarters','5 t or more a year','Makes oral care or OTC products'],hist:{sent:18,replies:3,meet:1,bounce:0,cr:107}},
+{id:'de',name:'Flavour & fragrance houses',market:'DE',count:41,ship:244,size:'$3.1M',prop:'Blend menthol and mint oils for food, fragrance and cosmetics.',why:'Supply from other origins fell for two quarters, and two buyers posted sourcing roles this month.',crit:['Imports 2906.11 or 3301.25','Flavour, fragrance or cosmetic industry','Bought from your origin in the last 12 months'],hist:{sent:12,replies:1,meet:0,bounce:0,cr:74}},
 {id:'nl',name:'Mint oil distributors',market:'NL',count:27,ship:158,size:'$1.9M',low:true,prop:'Re-sell mint oils and crystals across the EU from Rotterdam.',why:'Resale inside the EU is missing from customs data, so confidence is lower.',crit:['Imports 3301.24 or 3301.25','Re-sells inside the EU','Warehouse in the Netherlands'],hist:{sent:6,replies:0,meet:0,bounce:0,cr:31}},
 {id:'food',name:'Confectionery & gum makers',market:'US',count:18,ship:88,size:'95 t',prop:'Buy food-grade menthol and peppermint oil for gum and sweets.',why:'Smaller buyers with strict kosher and FSSC paperwork, reordering before spring.',crit:['Imports 2906.11 or 3301.24','Food manufacturer','Asks for food-grade papers'],hist:{sent:32,replies:0,meet:0,bounce:1,cr:118}}];
-const mk=(id,seg,co,city,cc,val,t,n,india,fit,dm,role,sig,sigAt,hook,o={})=>({id,seg,co,city,cc,val,t,n,india,fit,dm,role,sig,sigAt,hook,dom:id+'.example',codes:seg==='nl'?['3301.24','3301.25']:seg==='de'?['2906.11','3301.25']:seg==='food'?['2906.11','3301.24']:['2906.11'],...o});
+const mk=(id,seg,co,city,cc,val,t,n,share,fit,dm,role,sig,sigAt,hook,o={})=>({id,seg,co,city,cc,val,t,n,share,fit,dm,role,sig,sigAt,hook,dom:id+'.example',codes:seg==='nl'?['3301.24','3301.25']:seg==='de'?['2906.11','3301.25']:seg==='food'?['2906.11','3301.24']:['2906.11'],...o});
 const DATA=[
 mk('harrowgate-oral','us','Harrowgate Oral Care Inc','Newark','US',null,96,38,64,94,'Megan Holt','Director of Procurement','Hiring a Senior Buyer, Ingredients','10 Nov','hiring a Senior Buyer for ingredients'),
 mk('bellmere-consumer','us','Bellmere Consumer Health','Columbus','US',null,72,29,51,89,'Marcus Reyes','Purchasing Director','Headcount up 14% in 6 months','12 Nov','growing the team, up 14% in six months'),
 mk('cinderpeak-labs','us','Cinderpeak Labs LLC','Edison','US',null,41,17,70,82,'Priya Raman','Sourcing Manager','Procurement lead changed','14 Nov','under new procurement leadership since this month',{amber:'Procurement lead changed 14 Nov'}),
 mk('oakline-pharma','us','Oakline Pharma Products','Allentown','US',null,33,14,38,76,'Daniel Frost','Supply Chain Manager','No open buying roles','9 Nov','making OTC products in Allentown',{catchall:true}),
 mk('larkmont-health','us','Larkmont Health Trading','Newark','US',null,58,21,47,80,null,null,'Payment lawsuit filed','Oct 2026','',{red:'Payment lawsuit, Oct 2026. Excluded'}),
-mk('menthara-usa','us','Menthara Example USA Inc','Edison','US',null,24,10,100,60,null,null,'Parent is an Indian menthol exporter','Nov 2026','',{related:'Parent company sells menthol from India. Likely a competitor’s subsidiary'}),
+mk('menthara-usa','us','Menthara Example USA Inc','Edison','US',null,24,10,100,60,null,null,'Parent is a menthol exporter','Nov 2026','',{related:'Parent company exports menthol. Likely a competitor’s subsidiary'}),
 mk('elbtal-aromen','de','Elbtal Beispiel Aromen GmbH','Hamburg','DE',1280000,84,36,57,92,'Katrin Albers','Head of Procurement','Hiring a Strategic Buyer, Aroma','11 Nov','hiring a Strategic Buyer for aroma chemicals'),
 mk('weserhain-duft','de','Weserhain Duftstoffe GmbH','Bremen','DE',760000,49,22,44,84,'Jonas Brandt','Leiter Einkauf','2 open sourcing roles','7 Nov','hiring two people into sourcing',{merged:true}),
 mk('tannfeld-essenz','de','Tannfeld Essenzen GmbH','Leipzig','DE',540000,35,16,29,78,'Uwe Hartmann','Einkaufsleiter','New cosmetics line announced','2 Nov','starting a new cosmetics line',{amber:'Lookalike name, not auto-merged',look:'Tannfeld Essenz Handel UG (Leipzig, different register number)'}),
@@ -167,10 +167,10 @@ mk('plumridge-sweets','food','Plumridge Confections Co','Chicago','US',null,28,1
 mk('foxhollow-gum','food','Foxhollow Gum Works','St. Louis','US',null,19,9,42,74,'Chris Moreno','Operations Director','Headcount flat','8 Nov','making gum in St. Louis')];
 const REPLIES=[
 {who:'Brightwater Dental Products',seg:'us',text:'Send specs, a COA and CIF New York for 5 tonnes.',tag:'price question',you:true,stage:'Replied'},
-{who:'Copperleaf OTC Brands',seg:'us',text:'Tuesday works for a call. Can you cover kosher papers?',tag:'meeting booked, Tue 24 Nov 19:00 IST',stage:'Meeting'},
+{who:'Copperleaf OTC Brands',seg:'us',text:'Tuesday works for a call. Can you cover kosher papers?',tag:'meeting booked, Tue 24 Nov 08:30 New York',stage:'Meeting'},
 {who:'Greyfield Personal Care',seg:'us',text:'Not now, try us again in February.',tag:'not now',stage:'Replied'},
 {who:'Havelgrund Aroma GmbH',seg:'de',text:'Please write to our purchasing inbox instead.',tag:'wrong person',stage:'Replied'}];
-const GLOSS={hsn:"HSN code: the product's ID number on customs forms.",cif:"CIF: price including cost, insurance and freight to the buyer's port.",moq:'MOQ: the smallest order you accept.',landed:'Landed price: the price per kg when the goods arrive, before local taxes.',imp:'Consignee or importer: the company named as the receiver of a shipment.',dns:'SPF, DKIM and DMARC: settings that prove your emails really come from your domain.',credits:'Credits: what each data lookup costs.',fit:'Fit: how closely a buyer’s imports match your product.',trust:'Trust: whether every fact about a buyer could be checked.\nGreen: dated customs rows and a verified email.\nAmber: something can’t be checked, or changed recently.\nRed: adverse news, excluded.\nExcluded: your existing customer, never contacted.\nA related party or competitor subsidiary is Amber until you check it.'};
+const GLOSS={hsn:"HS code: the product's ID number on customs forms.",cif:"CIF: price including cost, insurance and freight to the buyer's port.",moq:'MOQ: the smallest order you accept.',landed:'Landed price: the price per kg when the goods arrive, before local taxes.',imp:'Consignee or importer: the company named as the receiver of a shipment.',dns:'SPF, DKIM and DMARC: settings that prove your emails really come from your domain.',credits:'Credits: what each data lookup costs.',fit:'Fit: how closely a buyer’s imports match your product.',trust:'Trust: whether every fact about a buyer could be checked.\nGreen: dated customs rows and a verified email.\nAmber: something can’t be checked, or changed recently.\nRed: adverse news, excluded.\nExcluded: your existing customer, never contacted.\nA related party or competitor subsidiary is Amber until you check it.'};
 const SRC={a:['customs records (Eximpedia), to '+RECORDS_TO,'consignee and shipment search',RECORDS_TO],b:['Crustdata','company, job and person search','Nov 2026'],c:['Apollo + verifier','person match, then email verification','22 Nov 2026'],m:['Meridian trust rules','rules in code, not a model score','22 Nov 2026'],s:['sanctions lists','screening list match','20 Nov 2026']};
 function rec(k,d={}){return LIVE?`${SRC[k][0].split(',')[0]}\nSee the buyer’s evidence list for the record and retrieval time.`:`${SRC[k][0]} (example record)\nEndpoint: ${d.ep||SRC[k][1]}\nRecord date: ${d.at||SRC[k][2]}\nRetrieved: ${RETRIEVED}`}
 const fn=(k,d)=>`<button class="src" data-pop="${esc(rec(k,d))}" aria-label="Source ${k}">${k}</button>`;
@@ -179,11 +179,11 @@ const legend=ks=>`<div class="foot">${ks.split('').map(k=>`<span>${fn(k)} ${esc(
 
 /* One run object. Every count on screen is derived from it. */
 const KEY='meridian.v2.run';
-const fresh=()=>({v:2,req:SAMPLE,url:'',list:'',mode:'product',codes:['2906.11','3301.25','3301.24'],segs:['us','de'],custom:[],step:0,wait:null,running:false,paused:null,done:{},logs:{},ledger:[],credits:0,limit:Number(QS.get('limit'))||120,fail:false,notes:[],held:{},dup:false,changed:null,drafts:{},auto:false,off:false,gmail:true,segOff:{},plan:1000,alerts:[true,true,true],launched:false,view:'start',tab:'co',cur:null,seg:'',trust:'',cc:'',col:'',picked:[],details:false,t0:null,seq:0});
-let S=fresh(),L={run:null,id:null,logs:[],err:null,calls:[],raw:''};
+const fresh=()=>({v:2,req:SAMPLE,url:'',list:'',mode:'product',codes:['2906.11','3301.25','3301.24'],segs:['us','de'],custom:[],step:0,wait:null,running:false,paused:null,done:{},logs:{},ledger:[],credits:0,limit:Number(QS.get('limit'))||120,fail:false,notes:[],held:{},dup:false,changed:null,drafts:{},auto:false,off:false,gmail:true,segOff:{},plan:1000,alerts:[true,true,true],launched:false,view:'start',tab:'co',cur:null,seg:'',trust:'',cc:'',extra:[],picked:[],details:false,t0:null,seq:0});
+let S=fresh(),L={edits:{},passed:{},run:null,id:null,logs:[],err:null,calls:[],raw:''};
 try{const x=JSON.parse(localStorage.getItem(KEY));if(!LIVE&&x&&x.v===2){S={...fresh(),...x};if(S.running){S.running=false;S.paused='reload'}}}catch(e){}
 const save=()=>{if(LIVE)return;try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-let editing=null,pressed=false,unfold=false,railOpen=false,timer=null;
+let colsOpen=false,editing=null,pressed=false,unfold=false,railOpen=false,timer=null;
 
 const allSegs=()=>[...SEGS,...S.custom],availSegs=()=>S.codes.some(c=>c!=='3302.90')?allSegs().filter(s=>!s.count||DATA.some(b=>b.seg===s.id&&b.codes.some(c=>S.codes.includes(c)))):[];
 const offTopic=()=>S.mode==='product'&&!/\b(menthol|mentha|mint|peppermint|spearmint)/i.test(S.req);
@@ -211,11 +211,11 @@ function mailOf(b){
  if(LIVE)return b.mailObj;
  const us=b.cc==='US',port={US:'New York',DE:'Hamburg',NL:'Rotterdam'}[b.cc],p=[
  `Hi ${b.dm.split(' ')[0]},`,`I saw that ${b.co.split(' ')[0]} is ${b.hook}, so this may be a good moment to compare a second source for menthol.`,
- 'We are Example Exporter in Uttar Pradesh: menthol crystals and mint oils, ISO 22000 and FSSAI certified, about 40 tonnes a month.',
+ 'We are Example Exporter: menthol crystals and mint oils, ISO 22000 and FSSC 22000 certified, about 40 tonnes a month.',
  `We can send a sample and COA to ${b.city} within 10 days, and quote CIF ${port} from 1 tonne.`,'Would a 15-minute call next week be useful?','Export desk, Example Exporter'];
- return{to:b.mail,subj:`Menthol crystals and mint oils for ${b.city}`,body:p.join('\n\n'),facts:[{t:b.hook,k:'b',at:b.sigAt},{t:'ISO 22000 and FSSAI certified',k:'m',at:ownFacts()?'your request, 22 Nov':'example seller profile'},{t:'about 40 tonnes a month',k:'m',at:ownFacts()?'your request, 22 Nov':'example seller profile'}],when:us?`Mon 23 Nov, 10:00 ${b.city} · ${/Chicago|St\. Louis/.test(b.city)?'21:30':'20:30'} IST`:`Mon 23 Nov, 10:00 ${b.city} · 14:30 IST`,key:`${b.id}-d0`};
+ return{to:b.mail,subj:`Menthol crystals and mint oils for ${b.city}`,body:p.join('\n\n'),facts:[{t:b.hook,k:'b',at:b.sigAt},{t:'ISO 22000 and FSSC 22000 certified',k:'m',at:ownFacts()?'your request, 22 Nov':'example seller profile'},{t:'about 40 tonnes a month',k:'m',at:ownFacts()?'your request, 22 Nov':'example seller profile'}],when:us?`Mon 23 Nov, 10:00 ${b.city}`:`Mon 23 Nov, 10:00 ${b.city}`,key:`${b.id}-d0`};
 }
-const dst=b=>LIVE?{status:b.status,text:null}:(S.drafts[b.id]||{status:'waiting'});
+const dst=b=>LIVE?{status:b.status,...(L.edits[b.id]||{})}:(S.drafts[b.id]||{status:'waiting'});
 const setD=(id,p)=>{S.drafts[id]={status:'waiting',...S.drafts[id],...p}};
 function counts(){
  const all=buyers(),dr=all.filter(b=>b.draft),wait=dr.filter(b=>dst(b).status==='waiting');
@@ -271,7 +271,7 @@ function resume(){
 function result(n){
  const c=counts();
  if(LIVE){const r=L.run||{};return['Request read',(r.plan?.hs||[]).map(x=>x.code||x).join(' · '),'Records and research read','',plural(c.all.length,'company','companies'),`${c.ppl.length} found`,plural(c.dr.length,'draft')][n-1]}
- return[S.mode==='list'?'Your company list':offTopic()?'Outside the example data':'Menthol and mint oils · UP · 40 t/mo','HSN '+S.codes.join(' · '),`${num(c.ship)} shipments · ${c.imp} importers`,'',`${plural(c.all.length,'company','companies')} researched`,`${c.ppl.length} of ${c.look.length} found`,plural(c.dr.length,'draft')][n-1];
+ return[S.mode==='list'?'Your company list':offTopic()?'Outside the example data':'Menthol and mint oils · 40 t/mo','HS '+S.codes.join(' · '),`${num(c.ship)} shipments · ${c.imp} importers`,'',`${plural(c.all.length,'company','companies')} researched`,`${c.ppl.length} of ${c.look.length} found`,plural(c.dr.length,'draft')][n-1];
 }
 </script>
 <script>
@@ -290,9 +290,9 @@ function banners(){
  if(LIVE&&L.err)h+=ban('bad','The live API returned an error',esc(L.err),A('reload','Try again'));
  if(S.paused==='limit')h+=ban('warn',`Stopped at ${S.credits} of ${S.limit} credits, before going over.`,`${counts().all.length} of ${cands().length} buyers are enriched. Resume with 40 more credits (≈ ${rs(40)})?`,A('resume','Resume with 40 more','btn p'));
  else if(S.paused)h+=ban('warn',`Paused at step ${S.step}.`,S.paused==='reload'?'The page restarted mid-run. Finished work is saved and won’t be paid for again.':'Finished work is saved and won’t be paid for again.',A('resume','Resume','btn p'));
- if(LIVE&&L.run){const se=(L.run.steps||[]).filter(s=>s.error&&s.status!=='done').map(s=>String(s.error).split('\n')[0])[0],ls=L.buyers||[];if(se&&S.wait!=='select')h+=ban('warn','The run needs attention',esc(se));if(ls.length&&!ls.some(b=>b.n))h+=ban('warn','Customs records don’t cover this search.','We researched company data and the web instead. These buyers are Amber (lower confidence) until confirmed, and none is claimed as an importer.')}
+ if(LIVE&&L.run){const se=(L.run.steps||[]).filter(s=>s.error&&s.status!=='done').map(s=>String(s.error).split('\n')[0])[0],ls=L.buyers||[];const f=L.run.failure;if(f)h+=ban('warn',{budget:'Stopped at the spending limit.',needs_input:'The run needs something from you.',cannot_verify:'This couldn’t be verified.',network:'A data call timed out.',rate_limited:'A data source asked us to slow down.',provider_refused:'A data source refused the call.'}[f.type]||'The run stopped.',esc(f.message||'')+(f.resumable?' Resuming doesn’t pay again.':''),f.resumable?A('resume','Resume','btn p'):'');else if(se&&S.wait!=='select')h+=ban('warn','The run needs attention',esc(se));if(ls.length&&!ls.some(b=>b.n))h+=ban('warn','Customs records don’t cover this search.','We researched company data and the web instead. These buyers are Amber (lower confidence) until confirmed, and none is claimed as an importer.')}
  if(S.notes.length&&!S.launched)h+=ban('warn','A data call failed',esc(S.notes[S.notes.length-1]),A('clearnote','Dismiss'));
- if(S.off)h+=ban('bad','Everything is paused.','No email will send and no run will spend until you switch it back on.',A('unpause','Resume Meridian'));
+ if(S.off)h+=ban('bad','Everything is paused.',LIVE?'No email will send until you switch it back on.':'No email will send and no run will spend until you switch it back on.',A('unpause','Resume Meridian'));
  if(!S.gmail)h+=ban('bad','Gmail disconnected at 14:02.',`Nothing will send. ${plural(counts().q.length,'approved email')} waiting.`,A('gmail','Reconnect'));
  return h;
 }
@@ -302,7 +302,7 @@ function ledgerTable(){
 }
 function spark(){
  const v=[49,50,48,52,51,53,52,55,54,56,57,58],m='Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov'.split(' '),y=x=>110-(x-44)*6;
- return`<svg class="spark" viewBox="0 0 640 145" role="img" aria-label="India's share rose from 49% to 58% between December and November"><polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${v.map((x,i)=>20+i*50+','+y(x)).join(' ')}"/><text x="20" y="${y(v[0])-9}">49%</text><text x="580" y="${y(v[11])+3}">India 58%</text>${m.map((x,i)=>`<text x="${20+i*50}" y="140" text-anchor="middle">${x}</text>`).join('')}</svg>`;
+ return`<svg class="spark" viewBox="0 0 640 145" role="img" aria-label="Your origin's share rose from 49% to 58% between December and November"><polyline fill="none" stroke="var(--accent)" stroke-width="2.5" points="${v.map((x,i)=>20+i*50+','+y(x)).join(' ')}"/><text x="20" y="${y(v[0])-9}">49%</text><text x="580" y="${y(v[11])+3}">58%</text>${m.map((x,i)=>`<text x="${20+i*50}" y="140" text-anchor="middle">${x}</text>`).join('')}</svg>`;
 }
 const tile=(b,s,c='')=>`<div class="inset stat"><b class="${c}">${b}</b><span>${s}</span></div>`;
 
@@ -312,28 +312,28 @@ V.start=()=>{
  return`<div class="sbar" style="padding:16px 24px;display:flex;justify-content:space-between"><div class="brand"><i></i>meridian</div>${S.step?A('back','Back to current search','link'):''}</div><div class="start">${banners()}${!LIVE&&S.needsDesk&&offTopic()?ban('warn','This product goes to live company research.','Meridian checks customs records, then researches companies, decision makers and emails on its own server. This public page isn’t connected to that server, so nothing has been searched. Run the same request on the live desk.'):''}
  <h1>Who abroad already buys what you make?</h1><p class="lede">Describe your product the way you'd tell a buyer. Meridian reads the customs records, finds the importers who already buy it, and drafts a first email to the person who decides. Nothing is sent until you approve it.</p>
  <div class="box"><label class="lab" for="req">${m==='list'?'Companies, one per line':m==='url'?'Your website':'Your request'}</label><textarea id="req" maxlength="2000" placeholder="${m==='list'?'Names, domains or CSV':m==='url'?'https://your-company.com':'What you make, how much, and where you want to sell'}">${esc(val)}</textarea>
- ${LIVE?`<label class="sm" for="country">Market for this search</label><input id="country" value="${esc(S.country||'United States')}"><label class="sm" for="dnc">Your existing customers, never contacted (comma separated)</label><input id="dnc" value="${esc(S.dnc||'')}">`:''}
+ ${LIVE?`<label class="sm" for="country">Market for this search</label><input id="country" value="${esc(S.country||'United States')}"><label class="sm" for="cname">Your company, so buyers you already supply are left out</label><input id="cname" maxlength="120" placeholder="Company name as it appears on your export records" value="${esc(S.client||'')}"><label class="sm" for="dnc">Your existing customers, never contacted (comma separated)</label><input id="dnc" value="${esc(S.dnc||'')}">`:''}
  <div class="r"><span class="sub" id="hint">Product · capacity · certifications · markets · minimum order</span>${A('find',m==='list'?'Find the people':'Find buyers →','btn p')}</div></div>
  <div class="or">${LIVE?'<span class="sub">Website and company-list searches aren’t wired to the live API yet.</span>':m==='product'?A('mode','Paste your website instead','','url')+A('mode','I already have a list of companies','','list'):A('mode','Describe your product instead','','product')+(m==='list'?A('exlist','Use the example list',''):'')}</div>
  ${m==='url'?'<p class="sub">Example mode doesn’t fetch websites. The menthol example product is used.</p>':''}
  <div class="chips" style="margin-top:14px"><span class="chip">≈ 4 min</span><span class="chip" id="est" ${LIVE?'hidden':''}>≈ ${estimate()} credits · ${rs(estimate())}${uncovered()?' · research mode, lower confidence':''}</span><span class="chip">vs. a consultant: ₹50,000+, 2–3 weeks</span></div>
- ${LIVE&&L.runs?.length?`<div class="card" style="margin-top:20px"><div class="lab">Open a saved run</div>${L.runs.map(x=>`<div class="row">${A('open',esc(x.request?.product||x.id)+' · '+esc(x.request?.target_country||''),'link',x.id)} <span class="pill">${esc(x.status)}</span><small>${esc(new Date(x.created_at).toLocaleString('en-IN'))}</small></div>`).join('')}</div>`:''}<div class="g3 three">${[['⌕','We read the customs records','Who imported your HSN codes, how much, at what price, from which country.'],['◎','We find the person who buys','Head of procurement at each importer, with a verified work email.'],['✉','You approve every email','Each fact in the draft links to the record it came from.']].map(x=>`<div class="card"><div class="ic">${x[0]}</div><b>${x[1]}</b><p>${x[2]}</p></div>`).join('')}</div></div>`;
+ ${LIVE&&L.runs?.length?`<div class="card" style="margin-top:20px"><div class="lab">Open a saved run</div>${L.runs.map(x=>`<div class="row">${A('open',esc(x.request?.product||x.id)+' · '+esc(x.request?.target_country||''),'link',x.id)} <span class="pill">${esc(x.status)}</span><small>${esc(new Date(x.created_at).toLocaleString('en-US'))}</small></div>`).join('')}</div>`:''}<div class="g3 three">${[['⌕','We read the customs records','Who imported your HS codes, how much, at what price, from which country.'],['◎','We find the person who buys','Head of procurement at each importer, with a verified work email.'],['✉','You approve every email','Each fact in the draft links to the record it came from.']].map(x=>`<div class="card"><div class="ic">${x[0]}</div><b>${x[1]}</b><p>${x[2]}</p></div>`).join('')}</div></div>`;
 };
 V.run=()=>{
  const c=counts(),found=LIVE?S.step>3:!!S.done.cons;
  return head(found?'Who imports it':'Reading your product',found&&S.step>3?A('go','Continue →','btn p',S.step>4?'work':'segments'):'')+
- (found?(LIVE?`<div class="card"><div class="lab">Found so far</div><h3>${plural(c.all.length,'company','companies')} on the shortlist</h3></div>`:`<div class="card"><h3>India’s share rose from 49% to 58%${fn('a')}</h3>${spark()}<div class="g4" style="margin-top:12px">${tile(num(c.ship)+fn('a'),'shipments, 12 months')+tile(c.imp+fn('a'),term('imp','importers'))+tile('$15.40'+fn('a'),term('landed','median landed price')+' per kg, all origins, where records carry values')+tile('$14.60'+fn('a'),'landed price per kg from India')}</div></div><div class="card flush" style="margin-top:12px">${legend('a')}</div>`)
+ (found?(LIVE?`<div class="card"><div class="lab">Found so far</div><h3>${plural(c.all.length,'company','companies')} on the shortlist</h3></div>`:`<div class="card"><h3>Your origin’s share rose from 49% to 58%${fn('a')}</h3>${spark()}<div class="g4" style="margin-top:12px">${tile(num(c.ship)+fn('a'),'shipments, 12 months')+tile(c.imp+fn('a'),term('imp','importers'))+tile('$15.40'+fn('a'),term('landed','median landed price')+' per kg, all origins, where records carry values')+tile('$14.60'+fn('a'),'landed price per kg from your origin')}</div></div><div class="card flush" style="margin-top:12px">${legend('a')}</div>`)
  :`<div class="card flush" role="status"><p style="padding:16px">${S.step<3?'Reading your request. The next step asks you to check what we understood.':LIVE?'Checking customs records, then researching companies and the web…':'Reading dated customs records…'}</p>${'<div class="skel"></div>'.repeat(4)}</div>`);
 };
 V.codes=()=>{
- if(LIVE){const p=L.run?.plan;return head('Product codes')+`<div class="card"><div class="lab">Your product</div><h3>${esc(L.run?.run?.request?.product||S.req)}</h3><div class="lab mt">${term('hsn','HSN codes')} chosen by the planner</div><div class="chips">${p?(p.hs||[]).map(h=>`<span class="chip"><b class="mono">${esc(h.code||h)}</b> ${esc(h.text||h.why||'')}</span>`).join('')||'None':'Planning…'}</div><p class="sub" style="margin-top:12px">The live API doesn’t pause for a code check yet.</p></div>`}
+ if(LIVE){const p=L.run?.plan;return head('Product codes')+`<div class="card"><div class="lab">Your product</div><h3>${esc(L.run?.run?.request?.product||S.req)}</h3>${p?.seller_origin?`<p class="sub">${p.seller_origin.source==='default'?'Your request doesn’t say where you ship from, so no email will state an origin.':`You ship from ${esc(p.seller_origin.name)}.`}</p>`:''}<div class="lab mt">${term('hsn','HS codes')} chosen by the planner</div><div class="chips">${p?(p.hs||[]).map(h=>`<span class="chip"><b class="mono">${esc(h.code||h)}</b> ${esc(h.text||h.why||'')}</span>`).join('')||'None':'Planning…'}</div><p class="sub" style="margin-top:12px">The live API doesn’t pause for a code check yet.</p></div>`}
  const w=S.wait==='codes',bad=offTopic()&&S.mode==='product',waiting=S.step===2&&S.running;
  return head('Confirm your product codes')+(bad?ban('warn','Example data covers menthol and mint only.','Your product was not searched, and Meridian won’t show menthol buyers as yours. Use the live API for other products, or run the menthol example.',A('sample','Use the menthol example','btn p')):'')+
  (uncovered()?ban('warn','Customs records don’t cover the UAE.','A live run searches company data by industry and keywords instead. Those buyers stay Amber (lower confidence) until confirmed.'):'')+
- `<div class="card" style="max-width:1000px"><div class="lab">Your product</div><h3>${bad?esc(S.req.slice(0,180)):'Menthol crystals and mint oils'}</h3>${bad?'':`${ownFacts()?'':'<p class="warnc sm">Example mode uses the sample seller facts and markets below, whatever you typed.</p>'}<div class="ink2" style="margin-top:8px">✓ About 40 tonnes a month, Uttar Pradesh, ships from Nhava Sheva<br>✓ ISO 22000 and FSSAI certified<br>✓ ${term('moq','MOQ')} 1 tonne · targets US, DE, NL</div>
- <div class="lab mt">How buyers file it at customs (${term('hsn','HSN codes')}) <span class="pill">untick any that don’t fit</span></div><div class="chips">${CODES.map(([c,d,t])=>{const on=S.codes.includes(c);return`<label class="chip ${on?'':'off'}"><input type="checkbox" data-c="code" value="${c}" ${on?'checked':''} ${w||waiting?'':'disabled'}><b class="mono t">${c}</b><span class="t">${d}</span><span class="pill ${t==='read'?'ok':''}">${t}</span></label>`}).join('')}</div>
+ `<div class="card" style="max-width:1000px"><div class="lab">Your product</div><h3>${bad?esc(S.req.slice(0,180)):'Menthol crystals and mint oils'}</h3>${bad?'':`${ownFacts()?'':'<p class="warnc sm">Example mode uses the sample seller facts and markets below, whatever you typed.</p>'}<div class="ink2" style="margin-top:8px">✓ About 40 tonnes a month, exported by sea<br>✓ ISO 22000 and FSSC 22000 certified<br>✓ ${term('moq','MOQ')} 1 tonne · targets US, DE, NL</div>
+ <div class="lab mt">How buyers file it at customs (${term('hsn','HS codes')}) <span class="pill">untick any that don’t fit</span></div><div class="chips">${CODES.map(([c,d,t])=>{const on=S.codes.includes(c);return`<label class="chip ${on?'':'off'}"><input type="checkbox" data-c="code" value="${c}" ${on?'checked':''} ${w||waiting?'':'disabled'}><b class="mono t">${c}</b><span class="t">${d}</span><span class="pill ${t==='read'?'ok':''}">${t}</span></label>`}).join('')}</div>
  <div class="lab mt">Customs coverage for your markets</div><div class="chips"><span class="chip">🇺🇸 United States <span class="pill warn">no values, tonnes only</span></span><span class="chip">🇩🇪 Germany <span class="pill ok">records to 3 Nov</span></span><span class="chip">🇳🇱 Netherlands <span class="pill warn">intra-EU not covered</span></span>${uncovered()?'<span class="chip">🇦🇪 UAE <span class="pill warn">no customs data → research mode</span></span>':''}</div>
- <div class="lab mt">Indian exporters already shipping this <span class="pill ok">✓ ${SHIPPERS.length} found</span><span>from shipper fields${fn('a')}</span></div><div class="g4">${SHIPPERS.slice(0,8).map(x=>`<span class="chip">${x[0]} · ${x[1]}%</span>`).join('')}</div><p class="sub" style="margin-top:8px">+${SHIPPERS.length-8} more</p>`}</div>`+
+ <div class="lab mt">Exporters already shipping this <span class="pill ok">✓ ${SHIPPERS.length} found</span><span>from shipper fields${fn('a')}</span></div><div class="g4">${SHIPPERS.slice(0,8).map(x=>`<span class="chip">${x[0]} · ${x[1]}%</span>`).join('')}</div><p class="sub" style="margin-top:8px">+${SHIPPERS.length-8} more</p>`}</div>`+
  (bad?'':`<div class="sticky">${A('okcodes',S.mode==='list'?'Looks right, find the people →':'Looks right, find importers →','btn p','',!S.codes.length?'Tick at least one code':!w?(S.step>2?'Already confirmed':'Still checking'):'')}${A('edit-product','Edit product')}${!S.codes.length?'<span class="warnc sm">Tick at least one code</span>':''}</div>`);
 };
 const zero=()=>ban('warn','No importer filed these codes into your markets in the last 12 months.','Try a neighbouring code, widen the search, or paste companies you know.',A('zero','Try 2906.11','btn','2906.11')+A('zero','Widen to mint oils','btn','3301.25')+A('newlist','Paste companies you know'));
@@ -347,16 +347,17 @@ V.segments=()=>{
  <div class="chips" style="margin-top:10px">${DATA.filter(b=>b.seg===s.id&&!skipPaid(b)).slice(0,2).map(b=>`<span class="pill">${esc(b.co.split(' ').slice(0,2).join(' '))}</span>`).join('')}</div>${(s.count||0)<5?'<p class="warnc sm">Too few importers to run alone. Merge with another segment?</p>':''}</div>`}).join('')}<button class="newseg" data-a="newseg"><span>+ New segment<br><span class="sm">describe it in a sentence, or paste a list of companies</span></span></button></div>`:zero())+
  `<div class="sticky">${A('oksegs',S.step===8?'Add companies from these segments →':`Find companies in ${plural(sel.length,'segment')} →`,'btn p','',!sel.length?'Select at least one segment':!can?'These segments are already searched':!cands().length?'No companies in this selection':'')}<span class="sub">≈ ${estimate()} credits · ${rs(estimate())} for the whole search · you can add segments later</span></div><div class="card flush">${legend('a')}</div>`;
 };
+function originHead(){const o=L.run?.plan?.seller_origin;return o&&o.source!=='default'?'From '+esc(o.name):'Origins'}
 function tableCompanies(list,pend){
- const pick=LIVE&&S.wait==='select',th=S.col?{price:'Avg price',fit:term('fit','Fit'),stage:'Stage'}[S.col]:'',red=list.filter(out),cols=S.col?[4,22,12,9,16,12,16,9]:[4,24,12,9,18,15,18];
+ const pick=LIVE&&S.wait==='select',X=S.extra||[],red=list.filter(out),base=[4,24,12,9,18,15,18],cols=[...base.map(w=>w*(100-X.length*8)/100),...X.map(()=>8)];
  const imp=b=>`${money(b)}<span class="dom">${b.val?(b.t?num(b.t)+' t':''):b.t?'no values':''}</span>`;
- const ex=b=>S.col==='price'?(b.val&&b.t?'$'+(b.val/b.t/1000).toFixed(2)+'/kg':'—'):S.col==='fit'?(b.fit??'—'):dst(b).status==='queued'?'Queued':b.draft?'Draft':'Researched';
+ const ex=(b,k)=>k==='price'?(b.val&&b.t?'$'+(b.val/b.t/1000).toFixed(2)+'/kg':'—'):k==='fit'?(b.fit??'—'):dst(b).status==='queued'?'Queued':b.draft?'Draft':'Researched';
  const rows=list.map(b=>`${b===red[0]?`<tr><td colspan="${cols.length}" class="lab" style="display:table-cell">Excluded (${red.length})</td></tr>`:''}<tr class="${out(b)?'red ':''}${S.picked.includes(b.id)?'picked':''}" tabindex="0" data-a="buyer" data-v="${esc(b.id)}">
  <td><input type="checkbox" data-c="pick" value="${esc(b.id)}" aria-label="Select ${esc(b.co)}" ${S.picked.includes(b.id)?'checked':''} ${out(b)||(LIVE&&!pick)?'disabled':''}></td>
  <td><div class="co"><span class="av">${esc(ini(b.co))}</span><div><b>${esc(b.co)}</b>${b.merged||(S.dup&&b.id===list[0].id)?` <button class="pill warn" data-pop="Two consignee spellings, one registered company and domain. Merged, and not paid twice.">2 records merged</button>`:''}${b.related?' <span class="pill warn" style="white-space:normal">Related party / competitor subsidiary</span>':''}${b.look?' <span class="pill warn">Lookalike name</span> '+A('compare','Compare','link sm',b.id):''}<span class="dom">${esc([b.dom,[b.city,b.cc].filter(Boolean).join(', ')].filter(Boolean).join(' · '))}</span></div></div></td>
- <td class="num">${imp(b)}</td><td class="num">${b.india!=null?b.india+'%':b.fromIndia?'Yes':'—'}</td><td>${tp(b)}<span class="dom">${esc(b.why)}</span></td><td class="sm ink2">${esc(b.sig||'—')}${b.sigAt?`<span class="dom">${esc(b.sigAt)}</span>`:''}</td>
- <td>${b.person?esc(b.dm):'—'}<span class="dom">${b.person?esc(b.role)+' · '+mailSt(b):out(b)?'Not searched':b.related?'Not searched until you check':'Not fetched'}</span></td>${S.col?`<td class="num">${ex(b)}</td>`:''}</tr>`).join('');
- return`<div class="card flush tbl"><table><colgroup>${cols.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th></th><th>Company</th><th class="num">Imports 12 mo${fn('a')}</th><th class="num">From India${fn('a')}</th><th>${term('trust','Trust')}${fn('m')}</th><th>Signal${fn('b')}</th><th>Decision maker${fn('b')}${fn('c')}</th>${th?`<th class="num">${th}</th>`:''}</tr></thead><tbody>${rows}</tbody></table>${pend?'<div class="skel"></div>'.repeat(Math.min(pend,6)):''}${legend('abcm')}</div>
+ <td class="num">${imp(b)}</td><td class="num">${b.share!=null&&(!LIVE||originHead()!=='Origins')?b.share+'%':b.origins?.length?esc(b.origins.slice(0,2).join(', ')):'—'}</td><td>${tp(b)}<span class="dom">${esc(b.why)}</span></td><td class="sm ink2">${esc(b.sig||'—')}${b.sigAt?`<span class="dom">${esc(b.sigAt)}</span>`:''}</td>
+ <td>${b.person?esc(b.dm):'—'}<span class="dom">${b.person?esc(b.role)+' · '+mailSt(b):out(b)?'Not searched':b.related?'Not searched until you check':'Not fetched'}</span></td>${X.map(k=>`<td class="num">${ex(b,k)}</td>`).join('')}</tr>`).join('');
+ return`<div class="card flush tbl"><div class="${X.length>1?'scroll wide':''}"><table><colgroup>${cols.map(w=>`<col style="width:${w}%">`).join('')}</colgroup><thead><tr><th></th><th>Company</th><th class="num">Imports 12 mo${fn('a')}</th><th class="num">${LIVE?originHead():'From your origin'}${fn('a')}</th><th>${term('trust','Trust')}${fn('m')}</th><th>Signal${fn('b')}</th><th>Decision maker${fn('b')}${fn('c')}</th>${X.map(k=>`<th class="num">${{price:'Avg price',fit:term('fit','Fit'),stage:'Stage'}[k]}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>${pend?'<div class="skel"></div>'.repeat(Math.min(pend,6)):''}${legend('abcm')}</div>
  <div class="cards">${list.map(b=>`<button class="card" data-a="buyer" data-v="${esc(b.id)}" style="${out(b)?'opacity:.55':''}"><h3>${esc(b.co)}</h3>${b.related?'<span class="pill warn" style="white-space:normal">Related party / competitor subsidiary</span>':''}<div style="margin:5px 0">${tp(b)} <span class="sm">${esc(b.why)}</span></div><span class="sub">${money(b)}ᵃ · ${esc(b.person?b.dm+', '+b.role:'Person not fetched')}</span></button>`).join('')}${legend('abcm')}</div>`;
 }
 V.work=()=>{
@@ -375,9 +376,10 @@ V.work=()=>{
  `<div class="head" style="margin-bottom:10px"><div class="tabs">${[['co','Companies',l.length],['dm','Decision makers',p.length],['em','Emails',d.length]].map(x=>A('tab',`${x[1]} ${x[2]}`,S.tab===x[0]?'on':'',x[0])).join('')}</div><div class="chips">
  <select class="chip" data-c="trust" aria-label="Filter by trust"><option value="">Trust: any</option>${['Green','Amber','Red','Excluded'].map(x=>`<option ${S.trust===x?'selected':''}>${x}</option>`).join('')}</select>
  <select class="chip" data-c="cc" aria-label="Filter by country"><option value="">Country: all</option>${ccs.map(x=>`<option ${S.cc===x?'selected':''}>${esc(x)}</option>`).join('')}</select>
- <select class="chip" data-c="col" aria-label="Add a column"><option value="">+ Column</option>${[['price','Avg price'],['fit','Fit'],['stage','Stage']].map(x=>`<option value="${x[0]}" ${S.col===x[0]?'selected':''}>${x[1]}</option>`).join('')}</select></div></div>
+ ${A('cols','+ Column'+(S.extra?.length?` (${S.extra.length})`:''),'chip')}${colsOpen?[['price','Avg price'],['fit','Fit'],['stage','Stage']].map(x=>`<label class="chip"><input type="checkbox" data-c="extra" value="${x[0]}" ${S.extra?.includes(x[0])?'checked':''}>${x[1]}</label>`).join(''):''}</div></div>
  <div class="head sub" style="margin-bottom:8px"><span>Showing ${l.length} of ${S.seg?(seg?.count||0):total}${LIVE||S.mode==='list'?'':' importers, researched by best fit'}</span>${how()}</div>${body}`;
 };
+const midOf=t=>t.split('\n\n').slice(1,-1).join('\n\n');
 function marks(b,m,text){
  const sp=[],ch=[];
  m.facts.forEach(f=>{const i=text.indexOf(f.t);if(f.t&&i>=0&&!sp.some(s=>i<s.e&&i+f.t.length>s.s))sp.push({s:i,e:i+f.t.length,f})});
@@ -405,15 +407,15 @@ function approvals(list,inTab){
  if(!b)return top+empty+(writing?'<div class="card"><p>Writing first emails…</p><div class="skel"></div><div class="skel"></div></div>':'');
  const m=mailOf(b),s=dst(b),text=s.text??m.body,mk=marks(b,m,text),ed=editing===b.id,i=list.indexOf(b);
  const can=s.status!=='waiting'?'Already decided':LIVE&&b.email!=='ok'?'No verified email, so it is held':S.off?'Everything is paused':ed?'Save your edit first':s.text&&!s.checked?'Run “Check my edits” first':'';
- const btns=()=>A('approve',LIVE?'Approve':'Approve and queue','btn p',b.id,can)+A('edit',ed?'Save edit':'Edit','btn',b.id,LIVE?'The live API has no edit endpoint yet':s.status!=='waiting'?'Already decided':'')+A('reject','Reject…','btn d',b.id,s.status!=='waiting'?'Already decided':'');
+ const btns=()=>A('approve',LIVE?'Approve':'Approve and queue','btn p',b.id,can)+A('edit',ed?'Save edit':'Edit','btn',b.id,s.status!=='waiting'?'Already decided':'')+A('reject','Reject…','btn d',b.id,s.status!=='waiting'?'Already decided':'');
  return top+empty+`<div class="appr"><div class="queue">${w.map(li).join('')}${held.map(x=>`<div class="li held"><span class="av">${esc(ini(x.dm))}</span><span class="grow"><b>${esc(x.dm)}</b> <span class="pill">held</span><small>${esc(x.why)}. Not drafted.</small></span></div>`).join('')}${other.map(li).join('')}<p class="sub" style="padding:8px 12px">Keys: J/K move · A approve · E edit · R reject</p></div>
  <div class="hasbar"><div class="phead"><span class="mono sm">${i+1} of ${list.length} · swipe →</span><span>${A('move','←','btn',-1)} ${A('move','→','btn',1)}</span></div><article class="card flush" id="mail">
  ${policy(b)&&s.status==='waiting'?`<div class="banner warn" style="margin:0"><b>Send policy</b><div>${esc(policy(b))}</div></div>`:''}<div class="meta"><span>Trust</span><span>${tp(b)} ${esc(b.why)}</span><span>Person</span><span><b>${esc(b.dm)}</b>, ${esc(b.role)} · ${esc(b.co)}</span><span>To</span><span>${esc(m.to)} <span class="pill ${b.email==='ok'?'ok':'warn'}">${b.email==='ok'?'verified':'not verified'}</span>${fn('c')}</span><span>Subject</span><b>${esc(m.subj)}</b><span>Sends</span><span>${esc(m.when)}${LIVE?'':' · follow-ups day 4 and 9, stop on reply'}</span></div>
- ${ed?`<label class="lab" for="body" style="padding:12px 20px 0;margin:0">Edit the email</label><textarea class="edit" id="body">${esc(text)}</textarea>`:`<div class="letter ${unfold?'':'fold'}">${mk.html}</div>`}
+ ${ed?`<label class="lab" for="body" style="padding:12px 20px 0;margin:0">Edit the email</label><textarea class="edit" id="body">${esc(LIVE?midOf(text):text)}</textarea>`:`<div class="letter ${unfold?'':'fold'}">${mk.html}</div>`}
  <button class="link sm phead" style="padding:8px 20px" data-a="unfold">${unfold?'Show less ▴':'Read full email and sources ▾'}</button>
  <div class="notes ${unfold?'':'fold'}">${m.facts.map(f=>`<span>${fn(f.k,{at:f.at})} ${esc(f.k==='b'?'Crustdata, '+(f.at||''):f.k==='a'?'Customs record':'Your own fact, '+(f.at||''))}</span>`).join('')}${b.n?`<span>${fn('a')} Why this buyer, kept out of the email: ${b.n} bills of lading, ${b.t!=null?num(b.t)+' t':'weight not stated'}${LIVE?'':', to '+RECORDS_TO}.</span>`:''}
- ${mk.ch.map(x=>`<span class="warnc">▲ You changed “${esc(x[0])}” to “${esc(x[1])}”. Your own claim, not checked against a record.</span>`).join('')}${s.text&&s.checked?'<span class="warnc">Example check done: the changed claim has no record, so approving asks you to confirm.</span>':''}${s.status==='waiting'?'':`<span>Status: ${esc(s.status)}${s.reason?', '+esc(s.reason):''}</span>`}</div>
- <div class="acts desk">${btns()}${s.status==='queued'&&!LIVE?A('undo','Undo','btn',b.id):''}${s.text&&!s.checked&&!ed?A('check','Check my edits','btn',b.id):''}<span class="key">sends once · key ${esc(m.key)}</span></div>
+ ${mk.ch.map(x=>`<span class="warnc">▲ You changed “${esc(x[0])}” to “${esc(x[1])}”. Your own claim, not checked against a record.</span>`).join('')}${s.text&&s.checked?'<span class="warnc">Example check done: the changed claim has no record, so approving asks you to confirm.</span>':''}${(s.problems||[]).map(x=>`<span class="warnc">▲ Critic: ${esc(x)}</span>`).join('')}${b.rechecked||L.passed[b.id]?'<span>Your edit passed the critic, and replaced the earlier draft.</span>':''}${s.status==='waiting'?'':`<span>Status: ${esc(s.status)}${s.reason?', '+esc(s.reason):''}</span>`}</div>
+ <div class="acts desk">${btns()}${(LIVE?['queued','rejected'].includes(s.status):s.status==='queued')?A('undo','Undo','btn',b.id):''}${s.text&&!s.checked&&!ed?A('check',s.busy?'Checking…':'Check my edits','btn',b.id,s.busy?'The critic is reading it':''):''}<span class="key">sends once · key ${esc(m.key)}</span></div>
  ${s.text&&!s.checked&&!ed?`<div class="acts phead">${A('check','Check my edits','btn',b.id)}</div>`:''}</article></div></div><div class="mbar">${btns()}</div>`;
 }
 V.approvals=()=>approvals(counts().dr,false);
@@ -424,9 +426,10 @@ function segStat(s){
 V.today=()=>{
  const c=counts(),rep=LIVE?[]:REPLIES.filter(r=>r.you),held=c.a.filter(b=>b.person||b.related),task=(t,p,b)=>`<div class="task"><div class="grow"><b>${t}</b><p>${p}</p></div>${b}</div>`,T=[];
  if(c.wait.length)T.push(task(`Approve ${plural(c.wait.length,'first email')}`,`${c.green.length} Green, ${c.wait.length-c.green.length} to check first`,A('go',`Review ${plural(c.wait.length,'email')}`,'btn p','approvals')));
- rep.forEach(r=>T.push(task(`${esc(r.who)} replied`,`“${esc(r.text)}” Price questions always come to you.`,A('go','Read the reply','btn','replies'))));
+ rep.forEach(r=>T.push(task(`${esc(r.who)} replied`,`“${esc(r.text)}” Price questions always come to you.`,A('draftreply',S.reply?.status==='queued'?'Open your reply':'Draft a reply','btn'))));
  if(held.length)T.push(task(`Check ${plural(held.length,'Amber buyer')}`,esc(held.slice(0,2).map(b=>`${b.co.split(' ')[0]}: ${b.why}`).join('. ')),A('amber','Check buyers')));
- if(!LIVE)T.push(task('Call with Copperleaf OTC Brands','Tue 24 Nov, 08:30 New York · 19:00 your time',A('go','Open reply','btn','replies')));
+ if(LIVE&&liveWaiting())T.push(task(`Approve ${plural(liveWaiting(),'drafted reply','drafted replies')}`,'The agent drafted them. Nothing sends until you approve.',A('go','Read replies','btn','replies')));
+ if(!LIVE)T.push(task('Call with Copperleaf OTC Brands','Tue 24 Nov, 08:30 New York',A('go','Open reply','btn','replies')));
  const h=LIVE?new Date().getHours():17,g=h<12?'morning':h<17?'afternoon':'evening';
  return`<div class="lab">${LIVE?esc(new Date().toDateString()):'Sunday, 22 November'}</div><h1 style="font-size:var(--greet);margin:6px 0 4px">Good ${g}, Tarang. <span style="color:var(--muted)">${T.length?`${plural(T.length,'thing')} need${T.length===1?'s':''} you.`:'All clear.'}</span></h1>
  <p class="ink2" style="font-size:var(--letter);margin-bottom:18px">${plural(c.all.length,'buyer')} researched in this search. ${plural(c.wait.length,'email')} waiting for you, and nothing from this search has been sent.</p>
@@ -445,10 +448,46 @@ V.campaigns=()=>{
  <div class="foot"><span>Sent, replies and meetings are example history from earlier searches. Status is set by rules you can read: <b>Scaling</b> = reply rate above 10% after 15 sends · <b>Working</b> = sending, below that · <b>Waiting on you</b> = held for approval or an Amber check · <b>Paused</b> = stopped by you or by the 3% bounce limit.</span></div></div>
  <div class="stack"><div class="card"><div class="lab">Plan this week</div><div class="head" style="margin:0"><b style="font-size:28px" id="pl-rs">₹${num(S.plan)}</b><span class="sub" id="pl-cr">≈ ${num(cr)} credits</span></div><input type="range" id="plan" min="250" max="3000" step="50" value="${S.plan}" aria-label="Weekly budget in rupees"><div class="g2" id="pl-out">${planTiles(cr)}</div><p class="sub" style="margin-top:10px">This is a total for the week, not a daily cap. Meridian stops at the limit and asks before spending more.</p></div>
  <div class="card" style="display:flex;gap:12px">${tgl('auto',S.auto,'Full-auto','',S.off?'Everything is paused':'')}<div><b>Full-auto</b> <span class="pill">${S.auto?'on':'off'}</span><p class="ink2 sm">When on, sends without waiting only to Green buyers with a verified email, up to 40 a day. Amber, Red, risky emails and every reply still come to you. Nothing ever sends on a timer.</p><p class="sub">Buyers in countries that need consent always wait. In this example the switch changes the setting only.</p></div></div>
- <div class="card"><div class="lab">What happens next</div><div class="row">${plural(counts().q.length,'email')} queued · Mon 23 Nov, buyer time</div><div class="row">2 follow-ups due 24 and 26 Nov</div><div class="row">Call with Copperleaf · Tue 19:00 IST</div></div></div></div>`;
+ <div class="card"><div class="lab">What happens next</div><div class="row">${plural(counts().q.length,'email')} queued · Mon 23 Nov, buyer time</div><div class="row">2 follow-ups due 24 and 26 Nov</div><div class="row">Call with Copperleaf · Tue 08:30 New York</div></div></div></div>`;
 };
 function planTiles(cr){const n=Math.floor(cr/7.2);return tile('≈ '+n,'buyers researched')+tile('≈ '+Math.round(n*.8),'decision makers found')+tile('≈ '+Math.round(n*.65),'emails drafted')+tile(`~${Math.round(n*.65*.03)}–${Math.round(n*.65*.08)}`,'replies, estimate')}
-V.replies=()=>LIVE?na('Replies','Replies come from the separate outreach module.'):head('Replies')+`<div class="card">${REPLIES.map(r=>`<div class="row"><b>${esc(r.who)}</b> <span class="pill ${r.you?'warn':''}">${esc(r.tag)}</span><p class="ink2">“${esc(r.text).replace('CIF',term('cif','CIF'))}”</p>${r.you?'<p class="warnc sm">Price questions always come to you. Reply drafting isn’t wired yet.</p>':''}</div>`).join('')}</div>`;
+V.replies=()=>LIVE?liveReplies():head('Replies')+`<div class="card">${REPLIES.map(r=>`<div class="row"><b>${esc(r.who)}</b> <span class="pill ${r.you?'warn':''}">${esc(r.tag)}</span><p class="ink2">“${esc(r.text).replace('CIF',term('cif','CIF'))}”</p>${r.you?replyBox():''}</div>`).join('')}</div>`;
+const REPLY=`Hi,
+
+Thank you for the note. For 5 tonnes of menthol crystals, CIF New York, our price is [your price].
+
+I can send the specification and a COA with the quote. Samples can ship within 10 days.
+
+Export desk, Example Exporter`;
+function replyBox(){
+ const r=S.reply;
+ if(!r)return`<p class="warnc sm">Price questions always come to you.</p>${A('draftreply','Draft a reply')}`;
+ if(r.status==='queued')return`<p class="inset" style="white-space:pre-line;margin-top:8px">${esc(r.text)}</p><p class="sub">Queued (simulated). ${A('undoreply','Undo','link')}</p>`;
+ return`<label class="lab mt" for="reply">Your reply · drafted from your product facts</label><textarea id="reply" class="edit" style="width:100%;margin:0">${esc(r.text)}</textarea><p class="warnc sm" id="replyhint">${/\[your price\]/.test(r.text)?'Meridian never invents a price. Replace [your price] before approving.':''}</p><div class="chips">${A('okreply','Approve reply','btn p','',S.off?'Everything is paused':/\[your price\]/.test(r.text)?'Add your price first':'')}${A('dropreply','Discard','btn d')}</div>`;
+}
+function liveReplies(){
+ const o=L.out;
+ if(!o)return head('Replies')+(L.outErr?ban('warn','Outreach isn’t available.',esc(L.outErr),A('reloadout','Try again')):'<p class="sub">Loading…</p>');
+ const conv=o.conversations||[],ds=(o.drafts||[]).filter(d=>d.kind!=='draft'),withR=conv.filter(c=>c.replies?.length);
+ return head('Replies',o.simulated?'<span class="pill warn">Simulated mailbox</span>':'')+
+ ds.map(d=>`<div class="card" style="margin-bottom:12px"><div class="lab">${d.kind==='reply'?'Drafted reply':'Drafted follow-up'} <span class="pill">${esc(d.status)}</span></div><h3>${esc(d.company)} · ${esc(d.subject)}</h3><p class="ink2" style="white-space:pre-line;margin-top:8px">${esc(d.body)}</p>
+ ${d.plan?.reason?`<p class="sub">Why: ${esc(d.plan.reason)}</p>`:''}${d.needs_person?'<p class="warnc sm">This one needs a person.</p>':''}${d.blocked?`<p class="warnc sm">${esc(d.blocked)}</p>`:''}
+ ${d.status==='proposed'?`<div class="chips" style="margin-top:10px">${A('outok','Approve','btn p',d.id+'|'+d.hash)}${A('outno','Reject','btn d',d.id)}</div>`:''}</div>`).join('')+
+ (withR.length?`<div class="card">${withR.map(c=>`<div class="row"><b>${esc(c.company)}</b> <span class="pill">${esc(c.state)}</span>${c.replies.map(m=>`<p class="ink2">“${esc(m.text)}” <span class="pill">${esc(m.label||m.kind)}</span></p>`).join('')}</div>`).join('')}</div>`:ds.length?'':ban('','No replies yet.','When a buyer replies, the agent drafts an answer from your product facts, and it waits here for you. Price, terms and complaints come to you without a draft.'));
+}
+function liveMailbox(){
+ const o=L.out;
+ if(!o)return head('Mailbox & alerts')+(L.outErr?ban('warn','Outreach isn’t available.',esc(L.outErr),A('reloadout','Try again')):'<p class="sub">Loading…</p>');
+ const cs=o.campaigns||[],paused=cs.length>0&&cs.every(c=>c.paused),ms=o.mailboxes||[],to=o.test_recipients||[];
+ return head('Mailbox & alerts',A(S.off?'unpause':'pauseall',S.off?'Resume Meridian':'Pause everything','btn '+(S.off?'':'d')))+
+ (o.simulated?ban('warn','Simulated mailbox.','Nothing reaches a real inbox.'):'')+(paused?ban('bad','All sending is paused.','Nothing sends until you resume it.'):'')+
+ `<div class="card"><div class="lab">Connection</div>${ms.map(m=>`<div class="setting"><b class="${m.health?'':'warnc'}">${m.health?'·':'!'}</b><div><b>${esc(m.email)}</b><p class="sub">${m.cap?`${esc(m.cap.left)} of ${esc(m.cap.limit)} sends left today`:'No limit read yet'}</p></div></div>`).join('')||'<p class="sub">No Gmail mailbox is connected, so nothing can send.</p>'}<p class="sub" style="margin-top:8px">${to.length?`Test mode: email goes only to ${plural(to.length,'team inbox','team inboxes')}.`:'No test inbox is set, so no email leaves this desk.'}</p></div>
+ <div class="card" style="margin-top:12px"><div class="lab">Alerts</div>${(o.alerts||[]).map(a=>`<div class="row">${esc(a.text)}</div>`).join('')||'<p class="sub">No alerts.</p>'}</div>`;
+}
+async function loadOut(){
+ try{L.out=await api('/outreach');L.outErr=''}catch(e){L.outErr=e.message}
+ bg();
+}
 V.pipeline=()=>{
  const c=counts(),hs=LIVE?[]:REPLIES,total=LIVE?0:sum(SEGS,s=>s.hist.sent);
  const cols=['Draft','Approved','Sent','Opened','Replied','Meeting','Sample','RFQ','Order'].map(k=>{const r=k==='Draft'?c.wait.map(b=>b.co):k==='Approved'?c.q.map(b=>b.co):hs.filter(x=>x.stage===k).map(x=>x.who),n=k==='Sent'?total-hs.length:r.length;return`<div><div class="lab">${k} <span class="pill">${n}</span></div>${r.map(x=>`<div class="kc">${esc(x)}</div>`).join('')}${k==='Sent'&&n?'<div class="kc">Earlier searches, no reply yet</div>':''}</div>`}).join('');
@@ -471,12 +510,12 @@ async function loadCrm(){
 V.market=()=>{
  const t=head('Market','<span class="pill acc">Feature 2 · coming next</span>')+ban('','Buyer intelligence is Feature 2.','Reorder rhythm, next buying window, share of wallet and supplier switching.'+(LIVE?'':' The preview below is example data.'));
  if(LIVE)return t;
- const c=counts(),max=64;return t+`<div class="g3">${tile(num(c.ship)+fn('a'),'shipments, 12 months')+tile('$15.40'+fn('a'),'median landed price per kg')+tile('58%'+fn('a'),'India’s share, latest month')}</div><div class="card" style="margin:16px 0"><h3>India’s share rose from 49% to 58%${fn('a')}</h3>${spark()}</div>
- <div class="g2 market gap"><div class="card"><div class="lab">Sourcing by origin${fn('a')}</div>${[['India',58],['China',24],['Germany',11],['Others',7]].map(x=>`<div class="hb"><span>${x[0]}</span><div class="bar"><i style="width:${x[1]/max*100}%"></i></div><span class="mono">${x[1]}%</span></div>`).join('')}</div>
- <div class="card"><div class="lab">Indian exporters already selling here${fn('a')}</div>${SHIPPERS.slice(0,6).map(x=>`<div class="hb" style="grid-template-columns:1fr 40px"><span>${x[0]}</span><span class="mono">${x[1]}%</span></div>`).join('')}</div></div><div class="card flush" style="margin-top:12px">${legend('a')}</div>`;
+ const c=counts(),max=64;return t+`<div class="g3">${tile(num(c.ship)+fn('a'),'shipments, 12 months')+tile('$15.40'+fn('a'),'median landed price per kg')+tile('58%'+fn('a'),'Your origin’s share, latest month')}</div><div class="card" style="margin:16px 0"><h3>Your origin’s share rose from 49% to 58%${fn('a')}</h3>${spark()}</div>
+ <div class="g2 market gap"><div class="card"><div class="lab">Sourcing by origin${fn('a')}</div>${[['Your origin',58],['Origin B',24],['Origin C',11],['Others',7]].map(x=>`<div class="hb"><span>${x[0]}</span><div class="bar"><i style="width:${x[1]/max*100}%"></i></div><span class="mono">${x[1]}%</span></div>`).join('')}</div>
+ <div class="card"><div class="lab">Exporters already selling here${fn('a')}</div>${SHIPPERS.slice(0,6).map(x=>`<div class="hb" style="grid-template-columns:1fr 40px"><span>${x[0]}</span><span class="mono">${x[1]}%</span></div>`).join('')}</div></div><div class="card flush" style="margin-top:12px">${legend('a')}</div>`;
 };
 V.mailbox=()=>{
- if(LIVE)return na('Mailbox & alerts','Gmail, deliverability checks and pause-all live in the separate outreach module.');
+ if(LIVE)return liveMailbox();
  const sent=sum(SEGS,s=>s.hist.sent),bn=sum(SEGS,s=>s.hist.bounce),chk=(ok,n,r)=>`<div class="setting"><b class="${ok?'okc':'warnc'}">${ok?'✓':'!'}</b><div style="flex:1;min-width:0"><b>${n}</b><div class="mono sm sub" style="overflow-wrap:anywhere">${r}</div></div><span class="sub">checked 09:12</span></div>`;
  return head('Mailbox & alerts',S.off?A('unpause','Resume Meridian'):A('pauseall','Pause everything','btn d'))+`<div class="cols"><div class="card"><div class="lab">Checklist · ${term('dns','SPF, DKIM, DMARC')}</div>${chk(S.gmail,'Gmail connection','export@example-exporter.example · send, read replies')+chk(true,'SPF','v=spf1 include:_spf.google.com ~all')+chk(true,'DKIM','google._domainkey · key found')+chk(true,'DMARC','v=DMARC1; p=quarantine')+chk(bn/sent<.03,'Bounce rate',`${(bn/sent*100).toFixed(1)}% overall · each segment stops over 3%`)}<div style="margin-top:12px">${A('gmail',S.gmail?'Disconnect':'Reconnect','btn '+(S.gmail?'d':''))}</div></div>
  <div class="stack"><div class="card"><div class="lab">Daily send limit</div><h3>20 emails a day</h3><p class="sub">Warm-up day 8 of 28. The limit rises to 40.</p></div><div class="card"><div class="lab">Alerts</div>${['A buyer replies. You get an email.','A segment pauses. You get an email with the reason.','An approval waits a day. You get one reminder, and it never sends.'].map((x,i)=>`<div class="setting">${tgl('alert',S.alerts[i],x,i)}<p>${x}</p></div>`).join('')}</div></div></div>`;
@@ -484,6 +523,7 @@ V.mailbox=()=>{
 </script>
 <script>
 const NAV=[['today','Today'],['start','New search'],['campaigns','Segments'],['approvals','Approvals'],['replies','Replies'],['pipeline','Pipeline'],['market','Market'],['mailbox','Mailbox & alerts']];
+const liveWaiting=()=>(L.out?.drafts||[]).filter(d=>d.kind!=='draft'&&d.status==='proposed').length;
 function demoPanel(){
  if(!DEMO)return'';
  const act=S.running,matched=counts().all.length,g=counts().wait.find(b=>!b.amber),b=(a,l,why)=>A(a,l,'btn','',why);
@@ -493,9 +533,9 @@ function demoPanel(){
  b('change','Change a fact',S.changed?'A fact was already changed':g?'':'Wait until a draft is ready')+b('reset','Reset demo','')}</div></div>`;
 }
 function rail(){
- let h=`<div class="brand"><i></i>meridian</div><div class="proj">${LIVE?'Your desk':'Example Exporter'}</div>`;
+ let h=`<div class="brand"><i></i>meridian</div><div class="proj">${LIVE?esc(L.run?.run?.request?.client_name||'Your desk'):'Example Exporter'}</div>`;
  if(S.launched&&S.step>=8){
-  const c=counts(),n={approvals:c.wait.length,replies:LIVE?0:REPLIES.filter(r=>r.you).length,campaigns:LIVE?0:allSegs().length};
+  const c=counts(),n={approvals:c.wait.length,replies:LIVE?liveWaiting():REPLIES.filter(r=>r.you&&S.reply?.status!=='queued').length,campaigns:LIVE?0:allSegs().length};
   h+=NAV.map(([k,l])=>`<button class="step nav ${S.view===k||(k==='campaigns'&&['work','segments'].includes(S.view))?'now':''}" data-a="go" data-v="${k}"><span class="c"></span>${esc(l)}${k==='market'?' <span class="pill" style="margin-left:auto">Feature 2</span>':n[k]?`<span class="n">${n[k]}</span>`:''}</button>`).join('');
  }else STEPS.forEach((t,i)=>{
   const n=i+1,skip=S.mode==='list'&&(n===3||n===4),done=n<S.step&&!skip,now=n===S.step,err=now&&S.paused;
@@ -518,7 +558,7 @@ function render(){
  const y=scrollY,ry=$('.rail')?.scrollTop||0,v=V[S.view]?S.view:'start';
  if(v==='start')$('#app').innerHTML=`<div class="shell nr"><main style="padding:0">${V.start()}</main></div>`;
  else{
-  const c=counts(),tabs=[['today','Today'],['work','Buyers'],['approvals',`Approve · ${c.wait.length}`],['replies',`Replies · ${LIVE?0:1}`]];
+  const c=counts(),tabs=[['today','Today'],['work','Buyers'],['approvals',`Approve · ${c.wait.length}`],['replies',`Replies · ${LIVE?liveWaiting():S.reply?.status==='queued'?0:1}`]];
   $('#app').innerHTML=`<div class="shell"><div class="top"><b>meridian</b><span class="sm">${S.step>0&&S.step<8?`${S.step} of 7 · ${STEPS[S.step-1]}`:''}</span>${A('rail',S.launched?'Menu ▾':'Steps ▾','link')}</div><nav class="rail ${railOpen?'open':''}" aria-label="Meridian">${rail()}</nav><main><div class="page">${banners()}${V[v]()}${S.details?ledgerTable():''}</div></main>
   <nav class="tabsb" aria-label="Main">${tabs.map(([k,l])=>A('go',l,S.view===k?'on':'',k)).join('')}${A('rail','More',railOpen?'on':'')}</nav></div>`;
  }
@@ -530,7 +570,7 @@ function render(){
 function clock(){const e=$('#timer');if(!e||!S.t0)return;const s=Math.min(5999,Math.floor((Date.now()-S.t0)/1000));e.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')} / 2:00`}
 function hint(){
  const t=$('#req');if(!t)return;const v=t.value.trim(),m=S.mode,bad=!v||(m==='product'&&v.length<20),b=$('[data-a=find]');
- b.disabled=bad||S.off;b.title=bad?'Describe your product first':'';
+ b.disabled=bad||(S.off&&!LIVE);b.title=bad?'Describe your product first':'';
  $('#hint').textContent=!v?(m==='list'?'Paste your companies first':m==='url'?'Paste your website first':'Describe your product first'):bad?'Add what you make and where you want to sell':'Product · capacity · certifications · markets · minimum order';
 }
 
@@ -544,18 +584,18 @@ function liveBehaviour(b){
  return`<div class="lab mt">Import records, ${esc(b.first_month)} to ${esc(b.last_month)}${fn('a')}</div><div class="g3">${f.map(x=>tile(esc(x[0]),x[1])).join('')}</div>
  ${b.origins?.length?`<p class="sm" style="margin-top:8px">Origins: ${esc(b.origins.join(', '))}</p>`:''}
  ${b.top_suppliers?.length?`<div class="lab mt">Their suppliers${fn('a')}</div>${b.top_suppliers.map(x=>`<div class="row">${esc(x.name)} <span class="mono" style="float:right">${Math.round(x.share*k)}%</span></div>`).join('')}`:''}`}
-function shipRows(b){return['3 Nov','26 Oct','14 Oct','29 Sep','11 Sep'].slice(0,b.n).map((d,i)=>[d,b.codes[i%b.codes.length],(i*37+10)%100<b.india?'India':'Other origin',(b.t/b.n*[1.2,.9,1.1,.8,1][i]).toFixed(1)])}
+function shipRows(b){return['3 Nov','26 Oct','14 Oct','29 Sep','11 Sep'].slice(0,b.n).map((d,i)=>[d,b.codes[i%b.codes.length],(i*37+10)%100<b.share?'Your origin':'Other origin',(b.t/b.n*[1.2,.9,1.1,.8,1][i]).toFixed(1)])}
 function drawer(id){
  const b=buyers().find(x=>x.id===id);if(!b)return;
  const w=[.8,.5,1,1.1,.6,1.3,.9,1.2,.7,1.4,1,1.5],m='Dec Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov'.split(' '),unit=(b.t||0)/sum(w,x=>x);
  const ev=LIVE?(b.claims||[]).map(c=>[c.kind==='customs'?'a':c.kind==='seller'?'m':'b',`${c.text} “${c.quote}”`,String(c.retrieved_at||'').slice(0,16)]):[b.n?['a',`${b.n} bills of lading matched to ${b.dom}`,'record to '+RECORDS_TO]:null,b.sigAt?['b',b.sig,'record '+b.sigAt]:null,b.person?['c',`${b.dm}, ${b.role}, email ${b.email==='ok'?'verified':'not verified'}`,'record 22 Nov 2026']:null,b.named?null:['s','No sanctions-list match (example check)','lists to 20 Nov 2026']].filter(Boolean);
  dlg(`<div class="head"><div><h2 id="dlg-title">${esc(b.co)}</h2><p>${tp(b)} <span class="sm">${esc(b.why)}</span></p>${b.related?'<span class="pill warn">Related party / competitor subsidiary</span>':''}</div>${A('close','✕')}</div>
- <div class="g3">${tile(b.val?money(b)+fn('a'):'—',b.val?'imports, 12 months':'no values in these records')+tile((b.t!=null?num(b.t):'—')+(b.t?fn('a'):''),'tonnes')+tile(b.india!=null?b.india+'%'+fn('a'):'—','from India')}</div>
+ <div class="g3">${tile(b.val?money(b)+fn('a'):'—',b.val?'imports, 12 months':'no values in these records')+tile((b.t!=null?num(b.t):'—')+(b.t?fn('a'):''),'tonnes')+(LIVE&&(b.share==null||originHead()==='Origins')?tile(b.origins?.length?esc(b.origins.slice(0,2).join(', '))+fn('a'):'—','origins'):tile(b.share!=null?b.share+'%'+fn('a'):'—',LIVE?originHead():'from your origin'))}</div>
  ${b.n&&b.t&&!LIVE?`<div class="lab mt">Monthly tonnes${fn('a')}</div><svg class="spark" viewBox="0 0 480 120" role="img" aria-label="${esc(b.t)} tonnes over 12 months, highest in November">${w.map((x,i)=>`<rect x="${i*40+6}" y="${95-x*58}" width="26" height="${x*58}" rx="3" fill="var(--accent)"/><text x="${i*40+19}" y="113" text-anchor="middle">${m[i]}</text>`).join('')}</svg><p class="sub">${b.t} tonnes in 12 months, highest in November at ${Math.round(unit*1.5)} t.</p>
- <div class="lab mt">Latest shipments${fn('a')}<span class="pill">invented example rows</span></div><table><tr><th>Arrived</th><th>HSN</th><th>Origin</th><th class="num">Tonnes</th></tr>${shipRows(b).map(r=>`<tr><td class="sm">${r[0]}</td><td class="mono sm">${r[1]}</td><td class="sm">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('')}</table><p class="sub">${Math.min(5,b.n)} of ${b.n} bills of lading.</p>
- <div class="lab mt">Sourcing by origin${fn('a')}</div>${[['India',b.india],['Others',100-b.india]].map(x=>`<div class="hb"><span>${x[0]}</span><div class="bar"><i style="width:${x[1]}%"></i></div><span class="mono">${x[1]}%</span></div>`).join('')}`:''}
+ <div class="lab mt">Latest shipments${fn('a')}<span class="pill">invented example rows</span></div><table><tr><th>Arrived</th><th>HS</th><th>Origin</th><th class="num">Tonnes</th></tr>${shipRows(b).map(r=>`<tr><td class="sm">${r[0]}</td><td class="mono sm">${r[1]}</td><td class="sm">${r[2]}</td><td class="num">${r[3]}</td></tr>`).join('')}</table><p class="sub">${Math.min(5,b.n)} of ${b.n} bills of lading.</p>
+ <div class="lab mt">Sourcing by origin${fn('a')}</div>${[['Your origin',b.share],['Others',100-b.share]].map(x=>`<div class="hb"><span>${x[0]}</span><div class="bar"><i style="width:${x[1]}%"></i></div><span class="mono">${x[1]}%</span></div>`).join('')}`:''}
  ${LIVE&&b.beh?liveBehaviour(b.beh):''}<div class="lab mt">Decision maker</div><p>${b.person?`<b>${esc(b.dm)}</b>, ${esc(b.role)} · <span class="sm">${mailSt(b)}</span>`:out(b)?'Not searched, because this buyer is excluded.':'Not fetched. We only look up people you’ll contact.'}</p>
- <p class="sub">${b.fit!=null?`${term('fit','Fit')} ${esc(b.fit)} of 100${b.codes?` · HSN ${esc(b.codes.join(', '))}`:''}`:''}${!LIVE&&b.val?` · avg $${(b.val/b.t/1000).toFixed(2)}/kg${fn('a')}`:''}</p>
+ <p class="sub">${b.fit!=null?`${term('fit','Fit')} ${esc(b.fit)} of 100${b.codes?` · HS ${esc(b.codes.join(', '))}`:''}`:''}${!LIVE&&b.val?` · avg $${(b.val/b.t/1000).toFixed(2)}/kg${fn('a')}`:''}</p>
  <div class="lab mt">Evidence</div>${ev.map(([k,t,d])=>`<div class="row"><span class="pill acc">${k}</span> ${esc(t)}<small>${esc(d)}${LIVE?'':' · retrieved '+RETRIEVED}</small></div>`).join('')||'<p class="sub">No accepted evidence.</p>'}
  <div class="dlg-act">${A('review','Review first email','btn p',b.id,b.draft?'':'No draft for this buyer')}</div>`,true);
 }
@@ -567,7 +607,7 @@ function toast(t,ids){
 async function approve(ids){
  closeD();if(S.off)return toast('Everything is paused. Nothing was approved.');
  const ok=counts().wait.filter(b=>ids.includes(b.id));if(!ok.length)return;
- if(LIVE){for(const b of ok)await api(`/actions/${b.action}/approve`,{});toast(`${plural(ok.length,'email')} approved. Nothing was sent.`);return poll()}
+ if(LIVE){const res=(await api('/actions/batch-approve',{items:ok.map(b=>({id:b.action,draft_hash:b.hash}))})).results,yes=res.filter(x=>x.ok),no=res.filter(x=>!x.ok);await poll();toast(`${plural(yes.length,'email')} approved.${no.length?` ${no.length} not approved: ${no[0].reason}.`:''}`,yes.map(x=>x.id));return}
  ok.forEach(b=>setD(b.id,{status:'queued'}));S.launched=true;S.cur=counts().wait[0]?.id||ok[0].id;unfold=false;
  const city=ok[0].city;toast(ok.length===1?`Queued for Mon 10:00 ${city} time (simulated)`:`${ok.length} emails queued for Monday, buyer time (simulated)`,ok.map(b=>b.id));
 }
@@ -580,8 +620,8 @@ const DO={
   const v=$('#req').value.trim();
   if(!LIVE&&S.mode==='product'){S.req=v;if(offTopic())return toResearch(v)}
   S.needsDesk=false;
-  if(LIVE){S.country=$('#country').value.trim();const b=$('[data-a=find]');b.style.width=b.offsetWidth+'px';b.textContent='…';b.disabled=true;
-   const r=await api('/runs',{product:v,target_country:S.country,notes:v.slice(0,1000),do_not_contact:(S.dnc||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean)});Object.assign(S,{req:v,step:1,view:'run',picked:[],cur:null,launched:false,wait:null});Object.assign(L,{id:r.run_id,run:null,buyers:[],logs:[],calls:[],raw:'',auto:''});follow();return poll()}
+  if(LIVE){const cn=(S.client||'').trim();if(cn&&cn.length<4)return toast('Your company name needs at least 4 characters.');S.country=$('#country').value.trim();const b=$('[data-a=find]');b.style.width=b.offsetWidth+'px';b.textContent='…';b.disabled=true;
+   const r=await api('/runs',{product:v,target_country:S.country,notes:v.slice(0,1000),...(cn?{client_name:cn}:{}),do_not_contact:(S.dnc||'').split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean)});Object.assign(S,{req:v,step:1,view:'run',picked:[],cur:null,launched:false,wait:null});Object.assign(L,{id:r.run_id,run:null,buyers:[],logs:[],calls:[],raw:'',auto:''});follow();return poll()}
   const o=S,next=fresh();Object.assign(next,{mode:o.mode,req:o.mode==='product'?v:SAMPLE,url:o.mode==='url'?v:'',list:o.mode==='list'?v:'',limit:Number(QS.get('limit'))||120,auto:o.auto,off:o.off,gmail:o.gmail,plan:o.plan,t0:Date.now()});
   S=next;enter(1)},
  mode:v=>{const t=$('#req')?.value||'';if(S.mode==='product')S.req=t;else if(S.mode==='list')S.list=t;else S.url=t;S.mode=v},
@@ -596,30 +636,45 @@ const DO={
  addseg:()=>{const t=$('#segname').value.trim();if(!t)return;S.custom.push({id:'c'+Date.now(),name:t,market:'new',count:0,size:'—',low:true,prop:'Saved from your sentence.',why:'Not researched in example mode.',crit:['Needs the live backend']});closeD()},
  newlist:()=>{closeD();S.mode='list';S.view='start'},
  zero:v=>{if(!S.codes.includes(v))S.codes.push(v)},
- go:v=>{if(v==='start'&&S.running){S.running=false;S.paused='stop'}railOpen=false;editing=null;S.view=v;if(LIVE&&v==='pipeline')loadCrm();if(v==='work'){S.seg='';S.tab='co'}scrollTo(0,0)},
+ go:v=>{if(v==='start'&&S.running){S.running=false;S.paused='stop'}railOpen=false;editing=null;S.view=v;if(LIVE&&v==='pipeline')loadCrm();if(LIVE&&['replies','mailbox','today'].includes(v))loadOut();if(v==='work'){S.seg='';S.tab='co'}scrollTo(0,0)},
  step:v=>{const n=+v;railOpen=false;S.view=n===1&&!LIVE&&S.step>=2?'codes':VIEW[n];S.seg='';S.tab=n===6?'dm':'co'},
  openseg:v=>{railOpen=false;Object.assign(S,{view:'work',seg:v,tab:'co',trust:'',cc:'',cur:null})},
+ cols:()=>{colsOpen=!colsOpen},
  tab:v=>{S.tab=v;S.cur=null;editing=null},clearf:()=>Object.assign(S,{seg:'',trust:'',cc:''}),
  amber:()=>Object.assign(S,{view:'work',seg:'',cc:'',trust:'Amber',tab:'co'}),
  buyer:drawer,review:v=>{closeD();S.view='approvals';S.cur=v},
  compare:v=>{const b=buyers().find(x=>x.id===v);dlg(`<h2 id="dlg-title">Two similar names, not merged</h2><div class="g2" style="margin-top:14px"><div class="inset"><b>${esc(b.co)}</b><p class="sub">${esc(b.dom)}<br>The customs consignee</p></div><div class="inset"><b>${esc(b.look)}</b><p class="sub">No matching domain</p></div></div><p class="sub" style="margin-top:10px">Meridian never merges lookalikes by itself. This buyer stays Amber.</p><div class="dlg-act">${A('close','Keep separate')}</div>`)},
  cur:v=>{S.cur=v;editing=null;unfold=false},move:v=>move(+v),unfold:()=>{unfold=!unfold},
- edit:v=>{if(LIVE)return;if(editing!==v){editing=v;unfold=true;setTimeout(()=>$('#body')?.focus())}else{const t=$('#body').value.trim(),b=buyers().find(x=>x.id===v);setD(v,{text:t&&t!==mailOf(b).body?t:null,checked:false});editing=null}},
- check:v=>setD(v,{checked:true}),
+ edit:v=>{if(editing!==v){editing=v;unfold=true;setTimeout(()=>$('#body')?.focus())}else{const raw=$('#body').value.trim(),b=buyers().find(x=>x.id===v),o=mailOf(b).body,bl=o.split('\n\n'),t=LIVE?(!raw||raw===midOf(o).trim()?'':[bl[0],raw,bl[bl.length-1]].join('\n\n')):raw;const x={text:t&&t!==mailOf(b).body.trim()?t:null,checked:false};if(LIVE){if(x.text)L.edits[v]=x;else delete L.edits[v]}else setD(v,x);editing=null}},
+ check:async v=>{
+  if(!LIVE)return setD(v,{checked:true});
+  const b=buyers().find(x=>x.id===v),e=L.edits[v];if(!b||!e||e.busy)return;
+  e.busy=true;render();
+  try{const r=await api(`/actions/${b.action}/edit`,{subject:mailOf(b).subj,text:midOf(e.text),draft_hash:b.hash});
+   if(r.ok){delete L.edits[v];L.passed[v]=1;await poll();toast('The critic passed your edit. Saved, and still waiting for your approval.')}else{e.problems=r.problems;e.busy=false}}
+  catch(err){e.busy=false;e.problems=['The check didn’t run: '+err.message+'. Your edit isn’t saved.']}},
  approve:v=>{const b=counts().wait.find(x=>x.id===v);if(!b||(LIVE&&b.email!=='ok'))return;const s=dst(b);if(S.off||editing===v||(s.text&&!s.checked))return;
   const pol=policy(b);if(!s.text&&!pol)return approve([v]);const n=s.text?marks(b,mailOf(b),s.text).ch.length:0;sheet(n?`Send with ${plural(n,'unchecked claim')}?`:'Approve under this country’s send policy?',`${esc(b.dm)}, ${esc(mailOf(b).when)}.${n?' Your edit has no record behind it.':''}${pol?`<p class="warnc">${esc(pol)}</p>`:''}`,A('okapprove',pol?'I’ve checked, approve':'Approve and queue','btn p',v))},
  okapprove:v=>approve([v]),
  batch:()=>{const g=counts().green;sheet(`Approve and queue ${plural(g.length,'email')}?`,`${g.map(b=>`<div class="row"><b>${esc(b.dm)}</b>, ${esc(b.co)}<small>${esc(mailOf(b).when)}</small></div>`).join('')}<p class="sub">Amber buyers are never included. Neither are countries that need consent.</p>`,A('okbatch',`Approve and queue ${plural(g.length,'email')}`,'btn k'))},
  okbatch:()=>approve(counts().green.map(b=>b.id)),
  reject:v=>{const b=counts().wait.find(x=>x.id===v);if(b)sheet(`Reject the email to ${esc(b.dm)}?`,`<div class="chips">${['Wrong person','Wrong product','Not now','Other'].map(r=>A('okreject',r,'btn',v+'|'+r)).join('')}</div>`,'')},
- okreject:async v=>{const[id,reason]=v.split('|');closeD();if(LIVE){const b=buyers().find(x=>x.id===id);await api(`/actions/${b.action}/reject`,{});return poll()}setD(id,{status:'rejected',reason});S.cur=counts().wait[0]?.id||id},
- undo:v=>setD(v,{status:'waiting'}),undotoast:()=>{undoIds.forEach(id=>setD(id,{status:'waiting'}));$('#toast').hidden=true},hidetoast:()=>{$('#toast').hidden=true},
+ okreject:async v=>{const[id,reason]=v.split('|');closeD();if(LIVE){const b=buyers().find(x=>x.id===id);await api(`/actions/${b.action}/reject`,{reason});return poll()}setD(id,{status:'rejected',reason});S.cur=counts().wait[0]?.id||id},
+ undo:async v=>{if(!LIVE)return setD(v,{status:'waiting'});await api(`/actions/${buyers().find(x=>x.id===v).action}/undo`,{});return poll()},undotoast:async()=>{$('#toast').hidden=true;if(!LIVE)return undoIds.forEach(id=>setD(id,{status:'waiting'}));for(const id of undoIds)await api(`/actions/${id}/undo`,{});return poll()},hidetoast:()=>{$('#toast').hidden=true},
  auto:()=>{if(S.auto){S.auto=false;return}sheet('Turn on Full-auto?','It would send without waiting only to Green buyers with a verified email, up to 40 a day. Amber, Red, risky emails and every reply still come to you. Nothing ever sends on a timer. In this example nothing is ever sent.',A('okauto','Turn on Full-auto','btn p'))},
  okauto:()=>{closeD();S.auto=true},
- pauseall:()=>sheet('Pause everything?','All sending and all runs stop. Drafts and finished work are kept.',A('okpause','Pause everything','btn d')),
- okpause:()=>{closeD();S.off=true;S.auto=false;if(S.running){S.running=false;S.paused='all'}},unpause:()=>{S.off=false},
+ pauseall:()=>sheet('Pause everything?',LIVE?'All sending stops. Drafts and finished work are kept.':'All sending and all runs stop. Drafts and finished work are kept.',A('okpause','Pause everything','btn d')),
+ okpause:async()=>{closeD();if(LIVE){S.off=(await api('/pause',{paused:true})).paused;return}S.off=true;S.auto=false;if(S.running){S.running=false;S.paused='all'}},unpause:async()=>{S.off=LIVE?(await api('/pause',{paused:false})).paused:false},
  gmail:()=>{S.gmail=!S.gmail},alert:v=>{S.alerts[+v]=!S.alerts[+v]},segoff:v=>{S.segOff[v]=!S.segOff[v]},
- launch:()=>{S.launched=true;S.view='today'},rail:()=>{railOpen=!railOpen},details:()=>{S.details=!S.details},
+ launch:()=>{S.launched=true;S.view='today';if(LIVE)loadOut()},
+ draftreply:()=>{if(!S.reply)S.reply={text:REPLY,status:'waiting'};S.view='replies';setTimeout(()=>$('#reply')?.focus())},
+ okreply:()=>{if(S.reply&&!S.off&&!/\[your price\]/.test(S.reply.text)){S.reply.status='queued';toast('Reply queued (simulated).')}},
+ undoreply:()=>{if(S.reply)S.reply.status='waiting'},dropreply:()=>{S.reply=null},reloadout:()=>loadOut(),
+ outok:async v=>{const[id,hash]=v.split('|');await api(`/outreach/drafts/${id}/approve`,{hash});toast('Approved. Sending still follows the mailbox rules.');return loadOut()},
+ outno:async v=>{await api(`/outreach/drafts/${v}/reject`,{});return loadOut()},
+ outpause:async()=>{for(const c of L.out.campaigns)await api('/outreach/campaigns',{client_id:c.client_id,paused:true});return loadOut()},
+ outresume:()=>sheet('Resume sending?','Approved emails can send again, inside each mailbox’s limits.',A('okoutresume','Resume sending','btn p')),
+ okoutresume:async()=>{closeD();for(const c of L.out.campaigns)await api('/outreach/campaigns',{client_id:c.client_id,paused:false});return loadOut()},rail:()=>{railOpen=!railOpen},details:()=>{S.details=!S.details},
  stop:()=>{if(S.running){S.running=false;S.paused='stop'}},
  fail:()=>{S.fail=true;toast('The next paid call will time out.')},
  resume:async()=>{if(LIVE){await api(`/runs/${L.id}/resume`,{});return poll()}if(S.paused&&!S.off)resume()},
@@ -637,11 +692,12 @@ document.addEventListener('click',async e=>{
  if(t.disabled)return;if(t.dataset.a==='seg')e.preventDefault();
  const a=t.dataset.a;
  try{await DO[a]?.(t.dataset.v);L.err&&a!=='reload'&&(L.err=null)}catch(err){if(LIVE){L.err=err.message;toast(err.message)}else throw err}
- if(!['buyer','compare','close','hidetoast','newseg','batch','reject','pauseall'].includes(a)){save();render()}
+ if(!['buyer','compare','close','hidetoast','newseg','batch','reject','pauseall','outresume'].includes(a)){save();render()}
 });
 document.addEventListener('change',e=>{
  const c=e.target.dataset.c;if(!c)return;const v=e.target.value,on=e.target.checked;
  if(c==='code')S.codes=CODES.map(x=>x[0]).filter(x=>x===v?on:S.codes.includes(x));
+ else if(c==='extra')S.extra=['price','fit','stage'].filter(x=>x===v?on:(S.extra||[]).includes(x));
  else if(c==='pick')S.picked=on?[...new Set([...S.picked,v])].slice(0,Number(L.run?.max_selected)||25):S.picked.filter(x=>x!==v);
  else S[c]=v;
  save();render();
@@ -649,7 +705,8 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
  const t=e.target;
  if(t.id==='req'){if(S.mode==='list')S.list=t.value;else if(S.mode==='url')S.url=t.value;else S.req=t.value;hint();if(!LIVE)$('#tag').hidden=S.mode==='product'&&!!S.req.trim()&&offTopic();$('#est').textContent=`≈ ${estimate()} credits · ${rs(estimate())}${uncovered()?' · research mode, lower confidence':''}`;save()}
- if(t.id==='country')S.country=t.value;if(t.id==='dnc')S.dnc=t.value;
+ if(t.id==='country')S.country=t.value;if(t.id==='dnc')S.dnc=t.value;if(t.id==='cname')S.client=t.value;
+ if(t.id==='reply'){S.reply.text=t.value;const bad=/\[your price\]/.test(t.value),b=$('[data-a=okreply]');b.disabled=bad||S.off;b.title=bad?'Add your price first':'';$('#replyhint').textContent=bad?'Meridian never invents a price. Replace [your price] before approving.':'';save()}
  if(t.id==='plan'){S.plan=+t.value;const cr=Math.round(S.plan*1.15);$('#pl-rs').textContent='₹'+num(S.plan);$('#pl-cr').textContent=`≈ ${num(cr)} credits`;$('#pl-out').innerHTML=planTiles(cr);save()}
 });
 document.addEventListener('keydown',e=>{
@@ -664,7 +721,7 @@ document.addEventListener('keydown',e=>{
 const down=v=>()=>{pressed=v};
 document.addEventListener('pointerdown',down(true),true);['pointerup','pointercancel'].forEach(n=>document.addEventListener(n,()=>setTimeout(down(false)),true));
 document.addEventListener('keydown',e=>{if(e.key===' '&&e.target.matches('button'))pressed=true},true);document.addEventListener('keyup',()=>setTimeout(down(false)),true);addEventListener('blur',down(false));
-let bgT=null;function bg(){clearTimeout(bgT);bgT=setTimeout(()=>{if(S.view==='start')return;if(pressed||document.activeElement?.matches('select'))bg();else render()},90)}
+let bgT=null;function bg(){clearTimeout(bgT);bgT=setTimeout(()=>{if(S.view==='start'||editing||document.activeElement?.matches('textarea'))return;if(pressed||document.activeElement?.matches('select'))bg();else render()},90)}
 let sx=null,sy=0;
 document.addEventListener('touchstart',e=>{sx=e.target.closest('#mail')&&!editing?e.touches[0].clientX:null;sy=e.touches[0].clientY},{passive:true});
 document.addEventListener('touchend',e=>{if(sx===null)return;const d=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;sx=null;if(Math.abs(d)>70&&Math.abs(d)>Math.abs(dy)){move(d<0?1:-1);save();render()}});
@@ -677,21 +734,22 @@ document.addEventListener('focusin',e=>{const t=e.target.closest('[data-pop]');i
 /* Live adapter. Serve this file from the tradescout server and open /?live=1. It never falls back to example data. */
 async function api(path,body){
  const r=await fetch('/api'+path,body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{}),d=await r.json().catch(()=>null);
+ if(r.status===422&&Array.isArray(d?.problems))return d;
  if(!r.ok||!d)throw new Error(d?.error||`Live API unavailable (${r.status} on ${path})`);return d;
 }
 function adopt(d){
- L.run=d;const acts=(d.actions||[]).filter(a=>a.kind==='email_draft');
+ L.run=d;if(typeof d.paused_all==='boolean')S.off=d.paused_all;const acts=(d.actions||[]).filter(a=>a.kind==='email_draft');
  L.buyers=(d.report?.leads||d.shortlist||[]).map(l=>{
   const a=acts.find(x=>x.payload?.lead_id===l.lead_id),p=a?.payload,b=l.behaviour,cs=(l.claims||[]).filter(c=>c.verdict!=='rejected'),st=l.contact?.email_status,em=st==='deliverable'?'ok':st==='catch_all'?'catch':st&&st!=='not_found'?'timeout':'none',need=(l.needs_person||[]).join('; '),rec=l.match==='import_record';
   const F=[].concat(l.flags||[]).map(x=>typeof x==='string'?{type:x}:x||{}),hit=re=>F.find(x=>re.test([x.type,x.code,x.kind].join(' ')));
-  const rp=l.related_party||hit(/related|subsidiar|competitor/i),related=rp?(rp.reason||rp.detail||(typeof rp==='string'?rp:'Related party or competitor subsidiary. Check first')):'';
+  const rp=l.related_party||hit(/related|subsidiar|competitor/i),related=rp?(rp.reason||rp.detail||(typeof rp==='string'?`Buys mostly from ${rp}, likely its own parent or sister company. Ranked last`:'Related party or competitor subsidiary. Check first')):'';
   const cu=l.existing_customer||hit(/existing.?customer/i),exr=l.excluded_reason||l.exclusion_reason||l.excluded?.reason||(typeof l.excluded==='string'?l.excluded:''),customer=cu||/existing.?customer/i.test(exr);
   const excluded=customer?'Excluded: your existing customer':exr?`Excluded: ${exr}`:l.excluded?'Excluded':'';
   const trust=excluded?'Excluded':related||!rec||need||em==='catch'||em==='timeout'?'Amber':em==='ok'?'Green':'Checking';
   const status=({proposed:'waiting',approved:'queued'})[a?.status]||a?.status||'none';
-  return{id:l.lead_id,co:l.company.name,dom:l.company.domain||'',city:'',cc:l.company.country_iso3,seg:'',val:b?.total_value_usd||null,t:b?.net_weight_kg!=null?Math.round(b.net_weight_kg/100)/10:null,beh:b,n:b?.records,india:null,fromIndia:(b?.origins||[]).some(o=>/^(india|ind|in)$/i.test(String(o).trim())),fit:l.fit_score,codes:l.hs_codes,claims:cs,
-   sig:cs.find(c=>c.kind==='web'||c.kind==='company_record')?.text||'',person:!!l.contact,dm:l.contact?.name||p?.to_name||'',role:l.contact?.title||p?.to_title||'',mail:l.contact?.email||'',email:em,trust,related,why:excluded||related?(excluded||related):trust==='Green'?'Import record and verified email':need||(!rec?'No import record. '+(l.match_reason||''):em==='none'?'Import record, email not checked yet':'Email not verified, held'),
-   draft:!!p&&!excluded,action:a?.id,status,mailObj:p&&{to:p.to_email||'no address',subj:p.subject,body:p.body,key:p.dedupe_key,when:'Not scheduled. Approving does not send.',facts:(p.sentences||[]).filter(s=>s.claim_ids?.length).map(s=>{const c=cs.find(x=>x.id===s.claim_ids[0]);return{t:s.text,k:c?.kind==='customs'?'a':c?.kind==='seller'?'m':'b',at:String(c?.retrieved_at||'').slice(0,10)}})}}});
+  return{id:l.lead_id,co:l.company.name,dom:l.company.domain||'',city:'',cc:l.company.country_iso3,seg:'',val:b?.total_value_usd||null,t:b?.net_weight_kg!=null?Math.round(b.net_weight_kg/100)/10:null,beh:b,n:b?.records,share:typeof l.origin_share==='number'?Math.round(l.origin_share*100):null,origins:b?.origins||[],fit:l.fit_score,codes:l.hs_codes,claims:cs,
+   sig:cs.find(c=>c.kind==='web'||c.kind==='company_record')?.text||'',person:!!l.contact,dm:l.contact?.name||p?.to_name||'',role:l.contact?.title||p?.to_title||'',mail:l.contact?.email||'',email:em,trust,related,why:excluded||related?(excluded||related):trust==='Green'?'Import record and verified email':need||d.trust?.[l.lead_id]?.reason||(!rec?'No import record. '+(l.match_reason||''):em==='none'?'Import record, email not checked yet':'Email not verified, held'),
+   draft:!!p&&!excluded,action:a?.id,hash:p?.draft_hash,rechecked:p?.rechecked_at,status,mailObj:p&&{to:p.to_email||'no address',subj:p.subject,body:p.body,key:p.dedupe_key,when:'Not scheduled. Approving does not send.',facts:(p.sentences||[]).filter(s=>s.claim_ids?.length).map(s=>{const c=cs.find(x=>x.id===s.claim_ids[0]);return{t:s.text,k:c?.kind==='customs'?'a':c?.kind==='seller'?'m':'b',at:String(c?.retrieved_at||'').slice(0,10)}})}}});
  const done=new Set((d.steps||[]).filter(s=>s.status==='done').map(s=>s.name||s.step)),wait=d.run.status==='awaiting_person',order=[['plan',1],['customs',3],['research',3],['shortlist',4],['select',5],['contacts',6],['write',7]];
  const pickable=wait&&!!L.buyers.length;S.wait=pickable?'select':null;S.step=pickable?5:d.report?8:(order.find(([n])=>!done.has(n))?.[1]||7);S.running=!!d.running;S.paused=!d.running&&d.run.status==='failed'?'stop':null;
  const key=pickable?'wait':d.report?'done':'s'+S.step;if(key!==L.auto){L.auto=key;S.view=pickable?'work':d.report?'approvals':VIEW[S.step];S.tab=S.step===6?'dm':'co'}
@@ -720,6 +778,7 @@ function follow(){
 if(!LIVE&&QS.get('seed')==='done'){S=fresh();S.t0=Date.now();enter(1);for(let i=0;i<200&&S.step<8;i++){if(S.wait==='codes')enter(3);else if(S.wait==='segs')enter(5);else{const o=ops(S.step).find(x=>!S.done[x.k]);if(!o){if(S.step===2){S.wait='codes'}else if(S.step===4){S.wait='segs'}else if(S.step===7){S.step=8;S.running=false}else enter(S.step+1)}else{S.credits+=o.cr;led(o.ep,o.cr,'ok',o.k);S.done[o.k]=1;logL(o.say)}}}S.launched=true;S.view='today';save();QS.delete('seed');history.replaceState(null,'',location.pathname+(QS.size?'?'+QS:''))}
 if(LIVE){
  $('#tag').hidden=true;S.req='';try{const q=sessionStorage.getItem('meridian.q');if(q){sessionStorage.removeItem('meridian.q');S.req=q;setTimeout(()=>{render();$('[data-a=find]')?.click()},300)}}catch(e){}
+ api('/pause').then(d=>{S.off=!!d.paused;bg()}).catch(()=>{});
  api('/runs').then(r=>{L.runs=r;const id=QS.get('run');if(id&&r.some(x=>x.id===id)){L.id=id;follow();poll()}else render()}).catch(e=>{L.err='No backend here. Serve this file from the tradescout server. '+e.message;render()});
 }else setInterval(tick,750);
 setInterval(clock,1000);render();
