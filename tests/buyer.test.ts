@@ -4,7 +4,7 @@ import { runPipeline } from "../src/runner/pipeline.js";
 import { checkDraft, draftHash } from "../src/buyer/write.js";
 import { behaviourOf, isBlank, isBuyerName, redactDescription, runQueries, type Row } from "../src/buyer/customs.js";
 import { quoteInSource, sourceAboutCompany } from "../src/buyer/common.js";
-import { nameMatch } from "../src/buyer/contacts.js";
+import { nameMatch, searchName } from "../src/buyer/contacts.js";
 import { onDoNotContact, selectStep } from "../src/buyer/select.js";
 import { pageText } from "../src/buyer/research.js";
 
@@ -59,6 +59,10 @@ describe("people gates", () => {
   it("matches a record name inside its market only on distinctive words", () => {
     expect(nameMatch("Examplecar Ecuador", "EXAMPLECAR CIA LTDA", "Ecuador")).toBe(1);
     expect(nameMatch("Austral Motors", "Pacific Motors")).toBeLessThan(0.8);
+  });
+  it("searches a record name as an exact phrase", () => {
+    expect(["EXAMPLON FLAVOURS AND FRAGRANCES LLC", "ACME INC", "AMERICAN WIDGET CO", "EXAMPLE AROMATICS INC"].map(searchName)).toEqual(["examplon", "acme", "american widget", "example aromatics"]);
+    expect(nameMatch("Examplon Flavors & Fragrances", "EXAMPLON FLAVOURS AND FRAGRANCES LLC")).toBe(1);
   });
   it("honours the don't-contact list", () => expect(onDoNotContact({ name: "Acme Steel LLC", domain: "acme.example" }, ["https://www.acme.example/"])).toBe(true));
   it("pauses for a selection, then continues without repeating work", async () => {

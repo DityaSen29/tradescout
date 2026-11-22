@@ -1,4 +1,7 @@
+import { z } from "zod";
 import type { StepCtx } from "../runner/pipeline.js";
+import { askJson } from "../agents/llm.js";
+import type { Plan } from "./plan.js";
 import { BudgetExceeded } from "../core/types.js";
 import { MAX_CREDITS } from "../core/limits.js";
 import { and, f, or, flattenCompany, flattenPerson } from "../sources/crustdata.js";
@@ -7,19 +10,31 @@ import { hashOf } from "../ledger/ledger.js";
 import type { EmailStatus, Lead } from "./contract.js";
 import { tracer, type Trace } from "./common.js";
 
-const LEGAL = /\b(s\.?a\.?s?\.?|c\.?a\.?|c[ií]a|compa[nñ][ií]a|ltda|limitada|an[oó]nima|l\.?l\.?c\.?|inc|ltd|limited|corp|corporation|co|fze|fzco|fzc|pvt|private|gmbh|s\.?r\.?l|de|del|la|el|the)\b\.?/gi;
-const words = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(LEGAL, " ").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(w => w.length > 1);
-/** The words of a record name worth searching on. */
-export const searchName = (name: string) => words(name).slice(0, 4).join(" ");
+const LEGAL = /\b(s\.?a\.?s?\.?|c\.?a\.?|c[ií]a|compa[nñ][ií]a|ltda|limitada|an[oó]nima|l\.?l\.?c\.?|inc|ltd|limited|corp|corporation|co|fze|fzco|fzc|pvt|private|gmbh|s\.?r\.?l|de|del|la|el|the|and|usa)\b\.?/gi;
+const words = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/flavour/g, "flavor").replace(LEGAL, " ").replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(w => w.length > 1);
+const COMMON = new Set("american national international global united universal general natural pacific premier royal first north south east west eastern western central new star golden".split(" "));
+/**
+ * The exact phrase to search for: the first distinctive word, or the first two words when the first is short or common.
+ * The fuzzy operator is not used: it reads "Mane" as "Made" and "Lane".
+ */
+export function searchName(name: string): string {
+  const w = name.toLowerCase().replace(/[.,()]/g, " ").trim().split(/\s+/).filter(Boolean);
+  if (w.length < 2) return w.join(" ");
+  // a second word only when it distinguishes and has one spelling
+  return words(w[1]).length && (w[0].length < 5 || COMMON.has(w[0]) || !/^flavou?rs?$/.test(w[1])) ? `${w[0]} ${w[1]}` : w[0];
+}
 /** Dice over the distinctive words of two company names. */
 export function nameMatch(a: string, b: string, market = ""): number {
   const skip = new Set(words(market));       // "Acme Ecuador" is ACME in Ecuador
   const keep = (s: string) => new Set(words(s).filter(w => !skip.has(w)));
   const x = keep(a), y = keep(b);
   if (!x.size || !y.size) return 0;
-  return (2 * [...x].filter(w => y.has(w)).length) / (x.size + y.size);
+  const both = [...x].filter(w => y.has(w)).length;
+  // the whole record name inside a longer registered name is a candidate: the identity critic decides
+  return both === y.size ? Math.max(0.8, (2 * both) / (x.size + y.size)) : (2 * both) / (x.size + y.size);
 }
 
+const Identity = z.object({ picks: z.array(z.object({ key: z.string(), company_id: z.string().nullable(), reason: z.string() })) });
 const MGMT = /\b(managing|gerente|propietario|presidente|jefe de (importaciones|log[ií]stica)|partner|procurement manager|ceo|chief executive|owner|founder|president|coo|chief operating|general manager|operations|project|commercial director|director)\w*/i;
 const NEVER = /\b(hr|human resources|marketing|finance|accountant|legal|software|talent|recruit)\w*/i;
 export function titleScore(title: string): number {
@@ -30,7 +45,8 @@ export function titleScore(title: string): number {
 /** Runs only on the companies a person selected. */
 export async function contactsStep(ctx: StepCtx): Promise<{ leads: Lead[]; trace: Trace[] }> {
   const { trace, say } = tracer(ctx);
-  const market: string = (ctx.outputs.plan as any).country.name;
+  const plan = ctx.outputs.plan as Plan;
+  const market = plan.country.name;
   const leads: Lead[] = structuredClone((ctx.outputs.select as { leads: Lead[] }).leads);
   if (!leads.length) return { leads, trace };
 
@@ -39,23 +55,43 @@ export async function contactsStep(ctx: StepCtx): Promise<{ leads: Lead[]; trace
     // names on export records are resolved inside the market: a namesake in another country is not the importer
     const iso = unresolved[0].company.country_iso3;
     const names = [...new Set(unresolved.map(l => searchName(l.company.name)).filter(n => n.length >= 3))];
-    const limit = 50;
+    const limit = 25;
     if (names.length) try {
-      const r = await ctx.call({ source: "crustdata", endpoint: "/company/search", request: { iso, names, limit }, maxUnits: limit * 0.03, credits: (x: any) => x.credits }, async () => {
-        const byName = names.map(n => f("basic_info.name", "(.)", n));
-        const x = await crust().companySearch({ filters: and(f("locations.country", "=", iso), byName.length > 1 ? or(...byName) : byName[0]), fields: ["basic_info.name", "basic_info.primary_domain", "crustdata_company_id"], limit });
+      const found: ReturnType<typeof flattenCompany>[] = [];
+      // one search per name: a shared search lets one common word crowd the others out of the result
+      for (const name of names) try {
+      const r = await ctx.call({ source: "crustdata", endpoint: "/company/search", request: { iso, name, limit, about: plan.company_search }, maxUnits: limit * 0.03, credits: (x: any) => x.credits }, async () => {
+        const x = await crust().companySearch({ filters: and(f("locations.country", "=", iso), f("basic_info.name", "[.]", name)), query: plan.company_search, mode: "hybrid", fields: ["basic_info.name", "basic_info.primary_domain", "basic_info.description", "crustdata_company_id"], limit });
         return { companies: x.data.companies as any[], credits: x.credits };
       });
-      const found = r.data.companies.map(flattenCompany).filter(c => c.name && c.company_id);
-      for (const l of unresolved) {
-        const m = found.map(c => ({ c, s: nameMatch(c.name!, l.company.name, market) })).filter(x => x.s >= 0.8).sort((x, y) => y.s - x.s)[0];
+      found.push(...r.data.companies.map(flattenCompany).filter(c => c.name && c.company_id));
+      } catch (err: any) {
+        if (err instanceof BudgetExceeded) throw err;
+        say("enrichment", `Lookup of "${name}" failed (${String(err?.message ?? err).slice(0, 80)}). The other names continue.`);
+      }
+      const namesakes = unresolved.map((l, i) => ({ key: `K${i + 1}`, l,
+        options: found.map(c => ({ c, s: nameMatch(c.name!, l.company.name, market) })).filter(x => x.s >= 0.8).sort((x, y) => y.s - x.s).slice(0, 5) }));
+      const toJudge = namesakes.filter(n => n.options.length);
+      // the same name is not the same company: a hair brand can share the name of a flavour house
+      const verdicts = !toJudge.length ? [] : (await askJson(ctx, { agent: "identity-critic", schema: Identity, maxOut: 1500,
+        task: `You are the identity critic. Each group lists companies that share a name with a buyer of the product. Pick the one whose own business could plausibly buy this product in industrial or wholesale quantity. Pick null when none plausibly could, when a record says too little to tell, or when it is merely a consumer brand with a matching name. A wrong pick emails a stranger: when in doubt, null. Return {"picks":[{"key","company_id":string or null,"reason": short}]}.`,
+        data: { product: plan.product_spec, buyer_types: plan.buyer_types, end_uses: plan.end_uses,
+          groups: toJudge.map(n => ({ key: n.key, candidates: n.options.map(({ c }) => ({ company_id: c.company_id, name: c.name, industries: c.industries, description: (c.description ?? "").slice(0, 600) })) })) } })).picks;
+      for (const { key, l, options } of namesakes) {
+        const pick = verdicts.find(v => v.key === key);
+        const m = options.find(o => o.c.company_id === pick?.company_id);
+        if (options.length && !m) {
+          l.needs_person.push(`identity not confirmed: ${pick?.reason ?? "the identity critic gave no verdict"}`);
+          say("critic", `${l.company.name}: same name, not shown to be the same company. ${pick?.reason ?? ""}`);
+          continue;
+        }
         if (!m) { l.needs_person.push("no confident Crustdata match in this country for the name on the record"); say("enrichment", `${l.company.name}: no confident company match, left for a person`); continue; }
         l.company.crustdata_company_id = m.c.company_id;
         l.company.domain = m.c.domain;
         say("enrichment", `${l.company.name}: matched to ${m.c.name}`);
       }
     } catch (err: any) {
-      if (err instanceof BudgetExceeded) throw err;
+      if (err instanceof BudgetExceeded || err?.name === "LlmError") throw err;
       for (const l of unresolved) l.needs_person.push(`company lookup unavailable: ${String(err?.message ?? err).slice(0, 80)}`);
     }
   }
