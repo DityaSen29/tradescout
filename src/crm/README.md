@@ -68,6 +68,7 @@ The module has its own gate instead of `ctx.call`, because sync runs outside pip
 npx tsx src/crm/demo.ts            # simulated, no network
 npx tsx src/crm/demo.ts --serve    # simulated, plus the panel on localhost:8790
 npx tsx src/crm/demo.ts --live     # writes two DEMO leads to the connected HubSpot account
+npx tsx src/crm/demo.ts --live --serve   # the same, then the live panel, only if every check passed
 npx tsx src/crm/server.ts          # the real module, standalone
 ```
 

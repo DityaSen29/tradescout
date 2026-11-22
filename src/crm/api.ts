@@ -7,7 +7,7 @@ import type { Conflict } from "./store.js";
 export function connectionView(sync: CrmSync, opts: { simulated?: boolean; hub?: CrmHub } = {}) {
   const { leads, conflicts, paused, connected, error, ...rest } = sync.status();
   const saved = opts.hub?.describe().find(c => c.key === sync.store.crm);
-  const key = !!opts.simulated || (opts.hub ? !!saved?.ready : !!process.env.HUBSPOT_TOKEN);
+  const key = !!opts.simulated || (opts.hub ? !!saved?.ready : connected || !!process.env.HUBSPOT_TOKEN);
   return {
     ...rest, error, simulated: !!opts.simulated,
     client: saved?.client ?? "*",

@@ -14,6 +14,7 @@ import { CrmSync, type SyncResult } from "./engine.js";
 import { HubSpot } from "./hubspot.js";
 import { TokenSource } from "./oauth.js";
 import { serveCrm } from "./server.js";
+import { startPolling } from "./router.js";
 import { HubSpotSimulator } from "./simulator.js";
 import { Zoho } from "./zoho.js";
 import { ZohoSimulator } from "./zoho-simulator.js";
@@ -139,7 +140,11 @@ async function main() {
     const r = await crm.push(run, leads);
     check(crm.status().conflicts.length === 2 && r.created === 0, "a CRM edit and a delete wait for a person");
   }
-  if (flag("serve")) serveCrm(crm, { simulated: !!sim });
+  if (!flag("serve")) return;
+  // the panel drops its SIMULATED label only for a real account, and only after every check passed against it
+  if (live && process.exitCode) { console.log("the live checks failed, so the live panel was not started"); return; }
+  serveCrm(crm, { simulated: !!sim });
+  if (live) startPolling(crm);
 }
 
 main().catch(e => { console.error(e?.message ?? e); process.exit(1); });
