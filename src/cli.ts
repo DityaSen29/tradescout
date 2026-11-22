@@ -33,6 +33,16 @@ async function main() {
   } else if (cmd === "ledger") {
     const runId = positional[0];
     console.log(JSON.stringify({ run: ledger.getRun(runId), steps: ledger.listSteps(runId), calls: ledger.listCalls(runId), totals: ledger.totals(runId), actions: ledger.listActions(runId) }, null, 2));
+  } else if (cmd === "check") {
+    const { Crustdata } = await import("./sources/crustdata.js");
+    const c = new Crustdata();
+    const cr = await c.credits();
+    console.log("credits:", JSON.stringify(cr.data));
+    const ep = await c.endpoints();
+    const d: any = ep.data; const list = d.endpoints ?? d.data ?? d;
+    const rows: any[] = Array.isArray(list) ? list : Object.entries(list).map(([k, v]: any) => ({ endpoint: k, ...(typeof v === "object" ? v : { value: v }) }));
+    console.log(`endpoints: ${rows.length}`);
+    for (const r of rows) console.log(JSON.stringify(r).slice(0, 220));
   } else if (cmd === "runs") {
     console.log(JSON.stringify(ledger.listRuns(20).map(r => ({ id: r.id, status: r.status, created_at: r.created_at, request: r.request })), null, 2));
   } else if (cmd === "approve" || cmd === "reject") {
