@@ -701,7 +701,7 @@ async function poll(){
  try{const d=await api('/runs/'+encodeURIComponent(L.id)),c=await api(`/runs/${encodeURIComponent(L.id)}/ledger`),raw=JSON.stringify([d,c]);L.calls=c.calls||[];
   if(raw!==L.raw||L.err){L.raw=raw;L.err=null;adopt(d);bg()}
   if(d.running)timer=setTimeout(poll,2500);
- }catch(e){L.err=e.message;render()}
+ }catch(e){L.err=e.message+'. Retrying, nothing is paid again.';render();timer=setTimeout(poll,4000)}
 }
 let es=null;
 async function toResearch(v){
