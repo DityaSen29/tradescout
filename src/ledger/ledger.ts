@@ -12,7 +12,7 @@ import { budgetDay, envLimit, limitFor, PAID_PROVIDERS, type PaidProvider } from
  * action with the same idempotency key can only execute once.
  */
 export interface RunRow {
-  id: string; request: TradeRequest; status: "running" | "done" | "failed" | "budget_exceeded";
+  id: string; request: TradeRequest; status: "running" | "done" | "failed" | "budget_exceeded" | "awaiting_person";
   created_at: string; updated_at: string; time_limit_ms: number; credit_limit: number;
 }
 export interface CallMeta {
@@ -65,6 +65,7 @@ export class Ledger {
         id TEXT PRIMARY KEY, run_id TEXT NOT NULL, provider TEXT NOT NULL, day TEXT NOT NULL,
         units REAL NOT NULL, state TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS spend_provider_day ON spend(provider, day);
+      CREATE TABLE IF NOT EXISTS selections (run_id TEXT PRIMARY KEY, lead_ids TEXT NOT NULL, at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS run_leases (run_id TEXT PRIMARY KEY, owner TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS snapshots (
         run_id TEXT NOT NULL, request_hash TEXT NOT NULL, taken_at TEXT NOT NULL, report_json TEXT NOT NULL);
@@ -84,7 +85,7 @@ export class Ledger {
     const t = now();
     this.db.prepare(`INSERT INTO runs (id, request_json, status, created_at, updated_at, time_limit_ms, credit_limit, clock_started_at) VALUES (?,?,?,?,?,?,?,?)`).run(
       id, JSON.stringify(request), "running", t, t,
-      limits?.time_limit_ms ?? envLimit("RUN_TIME_LIMIT_MS", 240000),
+      limits?.time_limit_ms ?? envLimit("RUN_TIME_LIMIT_MS", 300000),
       limits?.credit_limit ?? limitFor("crustdata", "run"), t);
     return id;
   }
@@ -207,6 +208,19 @@ export class Ledger {
   releaseRun(runId: string, owner: string) {
     this.db.prepare(`DELETE FROM run_leases WHERE run_id=? AND owner=?`).run(runId, owner);
     ownTokens.delete(owner);
+  }
+
+  // ---- the person's selection before paid enrichment --------------------
+  setSelection(runId: string, leadIds: string[]) {
+    if (this.stepOutput(runId, "select")?.status === "done") throw new Error("the selection was already used for this run; start a new run to change it");
+    this.db.prepare(`INSERT INTO selections VALUES (?,?,?) ON CONFLICT(run_id) DO UPDATE SET lead_ids=excluded.lead_ids, at=excluded.at`).run(runId, JSON.stringify(leadIds), now());
+  }
+  getSelection(runId: string): string[] | null {
+    const r = this.db.prepare(`SELECT lead_ids FROM selections WHERE run_id=?`).get(runId) as any;
+    return r ? JSON.parse(r.lead_ids) : null;
+  }
+  waitStep(runId: string, name: string, why: string) {
+    this.db.prepare(`UPDATE steps SET status='waiting', error=? WHERE run_id=? AND name=?`).run(why, runId, name);
   }
 
   // ---- evidence -----------------------------------------------------------

@@ -1,6 +1,6 @@
 import { Ledger, hashOf, now } from "../ledger/ledger.js";
 import type { Evidence, TradeRequest } from "../core/types.js";
-import { BudgetExceeded } from "../core/types.js";
+import { BudgetExceeded, NeedsPerson } from "../core/types.js";
 import { paidProvider } from "../core/limits.js";
 
 /**
@@ -22,7 +22,7 @@ export interface StepCtx {
 }
 export interface StepDef { name: string; run: (ctx: StepCtx) => Promise<unknown>; optional?: boolean }
 
-export interface RunOptions { log?: (msg: string) => void; onStep?: (name: string, status: "start" | "done" | "skip" | "fail" | "unavailable", info?: unknown) => void }
+export interface RunOptions { log?: (msg: string) => void; onStep?: (name: string, status: "start" | "done" | "skip" | "fail" | "unavailable" | "waiting", info?: unknown) => void }
 
 export async function runPipeline(ledger: Ledger, runId: string, steps: StepDef[], opts: RunOptions = {}): Promise<Record<string, unknown>> {
   if (!ledger.getRun(runId)) throw new Error(`unknown run ${runId}`);
@@ -60,6 +60,13 @@ async function runSteps(ledger: Ledger, runId: string, steps: StepDef[], opts: R
       opts.onStep?.(step.name, "done", out);
       log(`✓ ${step.name}`);
     } catch (err: any) {
+      if (err instanceof NeedsPerson) {
+        ledger.waitStep(runId, step.name, err.message);
+        ledger.setRunStatus(runId, "awaiting_person");
+        opts.onStep?.(step.name, "waiting", err.message);
+        log(`⏸ ${step.name}: ${err.message}`);
+        return outputs;
+      }
       if (err instanceof BudgetExceeded) {
         ledger.failStep(runId, step.name, err.message);
         ledger.setRunStatus(runId, "budget_exceeded");

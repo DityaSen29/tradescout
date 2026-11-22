@@ -7,8 +7,10 @@ export const RequestSchema = z.object({
   min_headcount: z.number().int().min(1).default(20),
   max_headcount: z.number().int().min(1).default(2000),
   fob_price_usd: z.number().positive().optional(),
-  hs_code: z.string().regex(/^\d{4,6}$/).optional(),      // the person's pick when the product was ambiguous
-  notes: z.string().optional(),
+  hs_code: z.string().regex(/^\d{4,8}$/).optional(),      // the person's pick when the product was ambiguous
+  notes: z.string().max(1000).optional(),     // the seller's own offer facts, quotable in outreach
+  client_id: z.string().max(80).optional(),
+  do_not_contact: z.array(z.string().max(200)).max(500).optional(),   // existing customers, agents, distributors
 });
 export type TradeRequest = z.infer<typeof RequestSchema>;
 
@@ -89,6 +91,11 @@ export interface Report {
   actions: ProposedAction[];
   limitations: string[];
   ledger: { credits_used: number; model_cost_usd: number; calls: number; elapsed_ms: number; credit_limit: number; time_limit_ms: number };
+}
+
+/** Thrown by a step that cannot continue without a person. The run pauses; resume picks it up. */
+export class NeedsPerson extends Error {
+  constructor(msg: string) { super(msg); this.name = "NeedsPerson"; }
 }
 
 export class BudgetExceeded extends Error {

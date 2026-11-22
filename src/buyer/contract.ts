@@ -4,6 +4,9 @@
  */
 export const CONTRACT_VERSION = 1;
 
+/** Downstream stages. A meeting is not the end. */
+export const STAGES = ["shortlisted", "selected", "drafted", "approved", "contacted", "replied", "meeting", "sample", "rfq", "order"] as const;
+
 export type EmailStatus = "deliverable" | "catch_all" | "invalid" | "unknown" | "not_found";
 /** What the evidence supports. Only import_record may be described as "imports". */
 export type MatchLabel = "import_record" | "product_match" | "category_match" | "cannot_verify";
