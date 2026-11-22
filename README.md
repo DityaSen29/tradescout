@@ -12,7 +12,7 @@ The repository is called `tradescout` because the product grew out of that codeb
 
 ### How to read the status labels
 
-Every capability in this document carries one of these labels. Status is as of 6:12 PM IST on 22 November 2026, at commit [`76518a6`](https://github.com/shivanshpilani/tradescout/commit/76518a6).
+Every capability in this document carries one of these labels. Status is as of 6:14 PM IST on 22 November 2026, at commit [`6000c04`](https://github.com/shivanshpilani/tradescout/commit/6000c04).
 
 | Label | Meaning |
 |---|---|
@@ -137,6 +137,8 @@ The exporter buys an **end-to-end distribution service**: from a product to rese
 | Ledger, checkpoints and resume | **Live** | A killed live run resumed with no additional credit spend |
 | Hard spend caps | **Live** | Every paid call is held against a cap before it starts |
 | Approval and exactly-once execution | **Built, tested offline** | An approved email is written once to a local file. It is not sent. |
+| Draft editing with critic re-check, batch approve, undo, reject reason, pause-all | **Live through the API, not yet in the redesigned desk** | An edit voids the approval. Batch approval binds to the exact text shown. Pause-all blocks execution. |
+| Step costs and typed failure states | **Live through the API, not yet in the redesigned desk** | Cost and share per step, and whether a failed run can resume |
 | Don't-contact list | **Built, tested offline** | Checked at shortlist and again before writing |
 | Swappable customs source | **Built** | Only the file adapter exists. No vendor API is connected. |
 | Local API, event stream and minimal interface | **Built** | Start, watch, select and approve from a browser |
@@ -195,7 +197,7 @@ A non-menthol product, stainless hose clamps in Australia, also ran live on the 
 
 The origin reading, added at 6:08 PM, ran live through planning and customs for sellers in China, Viet Nam and Uttar Pradesh, and for one brief that stated no origin.
 
-The redesigned desk doesn't send the exporter's company name yet, so automatic exclusion of existing buyers works from the minimal interface, the API and the command line. On the redesigned desk, list existing customers by hand. Its segments, draft editing with re-check, batch approve, pause-all, per-segment figures, per-country send rules, and website and named-company searches are example data.
+The redesigned desk doesn't send the exporter's company name yet, so automatic exclusion of existing buyers works from the minimal interface, the API and the command line. On the redesigned desk, list existing customers by hand. Its draft editing with re-check, batch approve and pause-all show example data until it is wired to the API that now does them. Its segments, per-segment figures, per-country send rules, and website and named-company searches are example data with no backend yet.
 
 The menthol runs also exposed real weaknesses:
 
@@ -208,10 +210,10 @@ The menthol runs also exposed real weaknesses:
 
 ### How we tested it
 
-On a fresh clone at `76518a6`, with Node 22.14:
+On a fresh clone at `6000c04`, with Node 22.14:
 
-- **229 automated tests in ten files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
-- **As shipped, 228 of 229 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 229 of 229 pass. The [run instructions](#tests) cover the real file.
+- **234 automated tests in eleven files.** They cover crash and resume, racing resumes, caps, duplicate execution, unknown outcomes, malformed responses, draft checks, redaction, the don't-contact list, related parties, seller origin, CRM sync and outreach.
+- **As shipped, 233 of 234 pass.** One test from the earlier product's sanctions module needs a public OFAC file that `npm run setup` doesn't download. With a one-line stand-in file, 234 of 234 pass. The [run instructions](#tests) cover the real file.
 - **The TypeScript type check passes.**
 - **The CRM demo passes its six checks against the simulator**, including a double push that creates nothing the second time.
 - **An impossible country ("Narnia") stops the run with "cannot verify" and zero external calls.**
@@ -540,7 +542,7 @@ sequenceDiagram
 - One run lease means two resumes can't both work.
 - An action moves from proposed to approved to executing to executed, and only one worker can make the move to executing.
 - A deduplication key of client, lead, person and sequence step works across runs.
-- Approval is tied to a SHA-256 hash of the subject and body.
+- Approval is tied to a SHA-256 hash of the subject and body. An edit goes back through both draft gates and voids the approval.
 - No email API can promise exactly-once delivery. When we can't know the outcome, the action becomes `unknown` and waits for a person. We prefer a missed send to a double send.
 
 ### Run it
