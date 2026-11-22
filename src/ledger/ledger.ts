@@ -34,7 +34,7 @@ export class Ledger {
       PRAGMA journal_mode = WAL;
       CREATE TABLE IF NOT EXISTS runs (
         id TEXT PRIMARY KEY, request_json TEXT NOT NULL, status TEXT NOT NULL,
-        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, time_limit_ms INTEGER NOT NULL, credit_limit REAL NOT NULL);
+        created_at TEXT NOT NULL, updated_at TEXT NOT NULL, time_limit_ms INTEGER NOT NULL, credit_limit REAL NOT NULL, clock_started_at TEXT);
       CREATE TABLE IF NOT EXISTS steps (
         run_id TEXT NOT NULL, name TEXT NOT NULL, status TEXT NOT NULL,
         started_at TEXT, finished_at TEXT, output_json TEXT, error TEXT, attempts INTEGER NOT NULL DEFAULT 0,
@@ -53,24 +53,27 @@ export class Ledger {
       CREATE TABLE IF NOT EXISTS snapshots (
         run_id TEXT NOT NULL, request_hash TEXT NOT NULL, taken_at TEXT NOT NULL, report_json TEXT NOT NULL);
     `);
+    try { this.db.exec(`ALTER TABLE runs ADD COLUMN clock_started_at TEXT`); } catch { /* column exists */ }
   }
 
   // ---- runs -------------------------------------------------------------
   createRun(request: TradeRequest, limits?: { time_limit_ms?: number; credit_limit?: number }): string {
     const id = randomUUID();
     const t = now();
-    this.db.prepare(`INSERT INTO runs VALUES (?,?,?,?,?,?,?)`).run(
+    this.db.prepare(`INSERT INTO runs (id, request_json, status, created_at, updated_at, time_limit_ms, credit_limit, clock_started_at) VALUES (?,?,?,?,?,?,?,?)`).run(
       id, JSON.stringify(request), "running", t, t,
       limits?.time_limit_ms ?? Number(process.env.RUN_TIME_LIMIT_MS ?? 240000),
-      limits?.credit_limit ?? Number(process.env.RUN_CREDIT_LIMIT ?? 60));
+      limits?.credit_limit ?? Number(process.env.RUN_CREDIT_LIMIT ?? 60), t);
     return id;
   }
   getRun(id: string): RunRow | null {
     const r = this.db.prepare(`SELECT * FROM runs WHERE id = ?`).get(id) as any;
     return r ? { ...r, request: JSON.parse(r.request_json) } : null;
   }
+  /** Status change. Entering "running" restarts the time ceiling's clock: the limit is active run time per attempt, not wall time across a kill. */
   setRunStatus(id: string, status: RunRow["status"]) {
-    this.db.prepare(`UPDATE runs SET status = ?, updated_at = ? WHERE id = ?`).run(status, now(), id);
+    if (status === "running") this.db.prepare(`UPDATE runs SET status = ?, updated_at = ?, clock_started_at = ? WHERE id = ?`).run(status, now(), now(), id);
+    else this.db.prepare(`UPDATE runs SET status = ?, updated_at = ? WHERE id = ?`).run(status, now(), id);
   }
   listRuns(limit = 50): RunRow[] {
     return (this.db.prepare(`SELECT * FROM runs ORDER BY created_at DESC LIMIT ?`).all(limit) as any[])
@@ -128,7 +131,7 @@ export class Ledger {
   assertBudget(runId: string) {
     const run = this.getRun(runId);
     if (!run) throw new Error(`unknown run ${runId}`);
-    const elapsed = Date.now() - Date.parse(run.created_at);
+    const elapsed = Date.now() - Date.parse((run as any).clock_started_at ?? run.created_at);
     if (elapsed > run.time_limit_ms) throw new BudgetExceeded("time", `run ${runId} exceeded ${run.time_limit_ms} ms`);
     const t = this.totals(runId);
     if (t.credits_used > run.credit_limit) throw new BudgetExceeded("credits", `run ${runId} used ${t.credits_used} of ${run.credit_limit} credits`);
@@ -189,7 +192,7 @@ export class Ledger {
     }
   }
   private rowToAction(r: any): ProposedAction {
-    return { id: r.id, kind: r.kind, idempotency_key: r.idempotency_key, status: r.status, payload: JSON.parse(r.payload_json), created_at: r.created_at, executed_at: r.executed_at };
+    return { id: r.id, run_id: r.run_id, kind: r.kind, idempotency_key: r.idempotency_key, status: r.status, payload: JSON.parse(r.payload_json), created_at: r.created_at, executed_at: r.executed_at };
   }
 
   // ---- snapshots for the monitor layer -----------------------------------

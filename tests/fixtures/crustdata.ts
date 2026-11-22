@@ -26,8 +26,8 @@ export const JOBS = { jobs: [
   { job_id: 9003, job_details: { title: "Backend Engineer" }, company: { basic_info: { company_id: 104 } }, metadata: { date_added: "2026-10-20" } },
 ] };
 export const PEOPLE = { profiles: [
-  { crustdata_person_id: 501, basic_profile: { name: "Anna Weber", headline: "Head of Procurement at Nordfaser", location: { country: "Germany" } }, experience: { employment_details: { current: { title: "Head of Procurement", company_name: "Nordfaser Technische Textilien GmbH", company_id: 101 } } }, basic_info: { professional_network_url: "https://www.linkedin.com/in/anna-weber" } },
-  { crustdata_person_id: 502, basic_profile: { name: "Jonas Keller", headline: "Managing Director", location: { country: "Germany" } }, experience: { employment_details: { current: { title: "Managing Director", company_name: "Nordfaser Handels GmbH", company_id: 102 } } }, basic_info: { professional_network_url: "https://www.linkedin.com/in/jonas-keller" } },
+  { crustdata_person_id: 501, basic_profile: { name: "Anna Weber", headline: "Head of Procurement at Nordfaser", location: { country: "Germany" }, professional_network_name: "anna-weber" }, experience: { employment_details: { current: [{ title: "Head of Procurement", name: "Nordfaser Technische Textilien GmbH", crustdata_company_id: 101, seniority_level: "Director" }] } } },
+  { crustdata_person_id: 502, basic_profile: { name: "Jonas Keller", headline: "Managing Director", location: { country: "Germany" } }, experience: { employment_details: { current: [{ title: "Managing Director", name: "Nordfaser Handels GmbH", crustdata_company_id: 102, seniority_level: "CXO" }] } } },
 ] };
 
 /** Install a fetch stub that answers Crustdata endpoints with the fixtures and counts calls per endpoint. */

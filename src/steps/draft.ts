@@ -8,8 +8,10 @@ export async function draftStep(ctx: StepCtx): Promise<{ actions: ProposedAction
   const parse = ctx.outputs.parse as any;
   const actions: ProposedAction[] = [];
   for (const c of vet.candidates.filter(c => c.contact && c.trust_tier !== "RED")) {
-    const signal = c.intent_tags[0] ? ` We noticed ${c.intent_tags[0]}.` : "";
-    const body = `Dear ${c.contact!.name},\n\nI run exports of ${ctx.request.product} (HS ${parse.hs.best?.code ?? ""}) from India and am looking for a distribution partner in ${parse.country?.name ?? c.country}. ${c.name} came up as a ${c.fit_reasons[0] ?? "relevant counterparty"}.${signal}\n\nWould you be open to a 20-minute call next week to see whether our range fits your portfolio? I can share specifications, certifications and indicative FOB pricing beforehand.\n\nBest regards,\n[Your name]\n[Company]`;
+    const signal = c.intent_tags[0] ? ` We also noticed ${c.intent_tags[0]}.` : "";
+    const why = c.fit_reasons.find(r => r.startsWith("describes itself")) ?? c.fit_reasons.find(r => r.startsWith("trades as")) ?? c.fit_reasons.find(r => r.startsWith("industry"));
+    const whyLine = why ? `${c.name} stood out because it ${why.replace("describes itself with", "works with").replace("industry:", "operates in")}.` : `${c.name} stood out as an established ${parse.country?.name ?? c.country} company in this category${c.headcount ? ` (about ${c.headcount} staff)` : ""}.`;
+    const body = `Dear ${c.contact!.name},\n\nI run exports of ${ctx.request.product} (HS ${parse.hs.best?.code ?? ""}) from India and am looking for a distribution partner in ${parse.country?.name ?? c.country}. ${whyLine}${signal}\n\nWould you be open to a 20-minute call next week to see whether our range fits your portfolio? I can share specifications, certifications and indicative FOB pricing beforehand.\n\nBest regards,\n[Your name]\n[Company]`;
     const a = ctx.ledger.proposeAction(ctx.runId, "email_draft", `draft:${ctx.runId}:${c.company_id}`, {
       to_name: c.contact!.name, to_title: c.contact!.title, company: c.name, company_id: c.company_id, subject: `Distribution partnership for ${ctx.request.product} in ${parse.country?.name ?? c.country}`, body,
       based_on: c.evidence.slice(0, 3).map(e => e.source_url),

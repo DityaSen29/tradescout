@@ -57,6 +57,9 @@ async function main() {
   } else if (cmd === "approve" || cmd === "reject") {
     ledger.decideAction(positional[0], cmd === "approve" ? "approved" : "rejected");
     console.log(JSON.stringify(ledger.getAction(positional[0]), null, 2));
+  } else if (cmd === "execute") {
+    const { executeApproved } = await import("./actions/execute.js");
+    console.log(JSON.stringify(await executeApproved(ledger, positional[0]), null, 2));
   } else {
     console.log(`usage:\n  run --product <text> --country <name|ISO3> [--min 20 --max 2000 --fob 12.5]\n  resume <run-id>\n  ledger <run-id>\n  runs\n  approve|reject <action-id>`);
   }

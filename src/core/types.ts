@@ -66,6 +66,7 @@ export interface LayerResult<T = unknown> {
 
 export interface ProposedAction {
   id: string;
+  run_id: string;
   kind: "email_draft" | "rfq_draft" | "shortlist_file";
   idempotency_key: string;
   status: "proposed" | "approved" | "rejected" | "executing" | "executed";

@@ -105,16 +105,18 @@ export function flattenCompany(c: any) {
     competitors: (get(c, "competitors.company_ids") ?? []) as number[],
   };
 }
+export interface Position { title: string | null; company: string | null; company_id: string | null; seniority: string | null }
+/** Flatten a person record. `experience.employment_details.current` is an array of positions. No profile URL is fetched: name, title and employer only. */
 export function flattenPerson(p: any) {
+  const cur = get(p, "experience.employment_details.current");
+  const list: any[] = Array.isArray(cur) ? cur : cur ? [cur] : [];
+  const positions: Position[] = list.map(x => ({ title: x.title ?? null, company: x.name ?? x.company_name ?? null, company_id: x.crustdata_company_id != null ? String(x.crustdata_company_id) : x.company_id != null ? String(x.company_id) : null, seniority: x.seniority_level ?? null }));
   return {
     person_id: String(p.crustdata_person_id ?? ""),
     name: get(p, "basic_profile.name") ?? null,
     headline: get(p, "basic_profile.headline") ?? null,
-    title: get(p, "experience.employment_details.current.title") ?? get(p, "basic_profile.current_title") ?? null,
-    company: get(p, "experience.employment_details.current.company_name") ?? null,
-    company_id: get(p, "experience.employment_details.current.company_id") ?? null,
     country: get(p, "basic_profile.location.country") ?? null,
-    linkedin: get(p, "basic_info.professional_network_url") ?? get(p, "basic_profile.professional_network_url") ?? null,
+    positions,
   };
 }
 const toNum = (v: unknown) => (v === null || v === undefined || v === "" || Number.isNaN(Number(v)) ? null : Number(v));
