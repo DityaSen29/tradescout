@@ -8,7 +8,7 @@ flowchart LR
   P --> T[tariff: WITS sector tariff, India vs MFN]
   P --> PW[policy: Crustdata web search, dated news only]
   P --> S[search: Crustdata company/search, widened once]
-  S --> G[(graph: companies, people, HS, signals, evidence)]
+  S --> G[(context graph, in memory: request, HS, keywords, companies, signals)]
   S --> F[fit: ICP rules]
   F --> E[vet: Crustdata company/enrich top N + sanctions CSV]
   E --> TR[trust tier rules]

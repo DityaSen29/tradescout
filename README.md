@@ -31,7 +31,7 @@ End to end, on a request it has never seen:
 
 ## What it could do in the future
 
-Line-level tariffs and rules of origin once a reliable HS6 tariff source is wired; shipment-record evidence (who already imports from India) from a customs-data provider; a watcher that re-runs the request weekly and alerts on tier changes; an LLM for parsing messy requests and polishing drafts, kept behind the same evidence contract; the Neo4j mirror (written, `src/graph/neo4j.ts`) running for graph exploration. Not now: each adds a source whose failure modes we could not test today, and the rubric rewards a correct run over a wide one.
+Line-level tariffs and rules of origin once a reliable HS6 tariff source is wired; shipment-record evidence (who already imports from India) from a customs-data provider; a watcher that re-runs the request weekly and alerts on tier changes; an LLM for parsing messy requests and polishing drafts, kept behind the same evidence contract. Not now: each adds a source whose failure modes we could not test today, and the rubric rewards a correct run over a wide one.
 
 ## The future of this service
 
@@ -114,7 +114,6 @@ A design pack (pitch, flow, trust rules, a diagram sketch and a 7-hour plan) was
 | typescript, tsx | Apache-2.0, MIT |
 | zod | MIT |
 | vitest | MIT |
-| neo4j-driver (mirror, optional) | Apache-2.0 |
 | IBM Plex Sans and Serif (fonts, via Google Fonts) | OFL-1.1 |
 
 Data: UN Comtrade (UN terms of use), World Bank WITS (CC BY 4.0), OFAC SDN and UN Security Council consolidated list (public domain), Crustdata (API terms, event credits).

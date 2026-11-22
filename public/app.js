@@ -124,8 +124,7 @@ function renderReport(d) {
   const gr = $("#graph");
   if (r?.graph) {
     const counts = {}; for (const n of r.graph.nodes) counts[n.label] = (counts[n.label] || 0) + 1;
-    gr.innerHTML = `<h2>Context graph</h2><dl>${Object.entries(counts).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}<dt>Edges</dt><dd>${r.graph.edges.length}</dd></dl>` +
-      (r.mirrored ? `<p class="state">Mirrored to Neo4j. <a href="${esc(r.mirrored.browser)}" target="_blank" rel="noopener">Open Neo4j Browser</a> and run:</p><p class="body" style="user-select:all">MATCH (n {run_id: "${esc(d.run.id)}"})-[x]->(m) RETURN n, x, m LIMIT 300</p>` : `<p class="state">Neo4j mirror not configured for this run; ranking uses the in-memory graph.</p>`);
+    gr.innerHTML = `<h2>Context graph</h2><dl>${Object.entries(counts).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${v}</dd>`).join("")}<dt>Edges</dt><dd>${r.graph.edges.length}</dd></dl><p class="state">Ranking runs on this graph: keyword coverage, family membership, support from similar peers, and signals.</p>`;
   } else gr.innerHTML = "";
   // monitor rail
   const m = $("#monitor");

@@ -1,8 +1,8 @@
 /**
  * The context graph. Every run builds a small graph around the request: the product family and HS code,
  * the keywords a distributor of that product uses, the candidate companies, the people at them, the signals
- * attached to each company, and the evidence behind every fact. Ranking reads this graph; Neo4j mirrors it
- * so it can be explored and shown.
+ * attached to each company, and the evidence behind every fact. Ranking reads this graph; The report carries it
+ * as JSON so it can be shown.
  */
 export type NodeLabel = "Request" | "HS" | "Family" | "Keyword" | "Country" | "Company" | "Person" | "Signal" | "Evidence" | "Policy";
 export type EdgeType = "ASKS_FOR" | "IN_MARKET" | "MAPS_TO" | "BELONGS_TO" | "MATCHES" | "LOCATED_IN" | "WORKS_AT" | "HAS_SIGNAL" | "SUPPORTED_BY" | "SIMILAR_TO" | "COMPETES_WITH" | "AFFECTED_BY";
@@ -16,7 +16,7 @@ export interface GraphSink {
   flush?(): Promise<void>;
 }
 
-/** In-memory graph: the source of truth for scoring inside a run. */
+/** In-memory graph: the source of truth for scoring inside a run, serialised into the report. */
 export class MemoryGraph implements GraphSink {
   nodes = new Map<string, GNode>();
   out = new Map<string, GEdge[]>();

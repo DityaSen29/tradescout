@@ -5,7 +5,6 @@ import { linkSimilar, rankCandidates } from "../scoring/rank.js";
 import { hashOf } from "../ledger/ledger.js";
 import type { VetOutput } from "./vet.js";
 import type { SearchOutput } from "./search.js";
-import { Neo4jGraph } from "../graph/neo4j.js";
 
 /** Final step: rank over the graph, assemble the report, save a snapshot and diff it against the previous run of the same request. */
 export async function reportStep(ctx: StepCtx): Promise<Report & { monitor: LayerResult; graph: unknown }> {
@@ -45,20 +44,6 @@ export async function reportStep(ctx: StepCtx): Promise<Report & { monitor: Laye
     for (const [id, p] of prevById) if (!candidates.find(c => c.company_id === id)) changes.push(`dropped: ${p.name}`);
     monitor = { layer: "monitor", status: "ok", data: { since: prev.taken_at, previous_run: prev.run_id, changes }, evidence: [{ claim: `compared with snapshot ${prev.run_id}`, source_type: "ledger", source_url: `ledger://snapshots/${prev.run_id}`, record_date: prev.taken_at, retrieved_at: new Date().toISOString() }], credits: 0, latency_ms: 0 };
   } else monitor = { layer: "monitor", status: "unavailable", reason: "first run for this request; nothing to compare", evidence: [], credits: 0, latency_ms: 0 };
-  // Mirror the context graph to Neo4j when a password is configured. Optional: a failure is logged, never fatal.
-  let mirrored: { nodes: number; edges: number; browser: string } | null = null;
-  if (process.env.NEO4J_PASSWORD) {
-    try {
-      const t0 = Date.now();
-      const mirror = new Neo4jGraph();
-      for (const n of g.nodes.values()) mirror.upsertNode(n);
-      for (const list of g.out.values()) for (const e of list) mirror.upsertEdge(e);
-      await mirror.flush(ctx.runId);
-      mirrored = { nodes: g.nodes.size, edges: [...g.out.values()].flat().length, browser: "http://localhost:7474" };
-      ctx.ledger.recordCall({ run_id: ctx.runId, step: "report", source: "neo4j", endpoint: "bolt flush", status: "ok", credits: 0, model_cost_usd: 0, latency_ms: Date.now() - t0, response_json: null, note: `${mirrored.nodes} nodes, ${mirrored.edges} edges` });
-      ctx.log(`graph: mirrored ${mirrored.nodes} nodes, ${mirrored.edges} edges to Neo4j`);
-    } catch (err: any) { ctx.log(`graph: Neo4j mirror unavailable (${err?.message ?? err})`); }
-  }
   const top = candidates.filter(c => c.trust_tier !== "RED").slice(0, 3);
   const summary = `${candidates.length} counterparties for ${ctx.request.product} (HS ${parse.hs.best?.code ?? "?"}) in ${parse.country?.name}: ${top.map(c => `${c.name} [${c.trust_tier}, fit ${c.fit_score}]`).join("; ") || "none passed vetting"}. ${unresolved.length} items need a person.`;
   const report = {
@@ -67,7 +52,7 @@ export async function reportStep(ctx: StepCtx): Promise<Report & { monitor: Laye
     summary, market: layer("market"), tariff: layer("tariff"), policy: layer("policy"), candidates, unresolved,
     actions: ctx.ledger.listActions(ctx.runId), limitations,
     ledger: { ...totals, elapsed_ms: Date.now() - Date.parse(run.created_at), credit_limit: run.credit_limit, time_limit_ms: run.time_limit_ms },
-    monitor, graph: g.toJSON(), mirrored,
+    monitor, graph: g.toJSON(),
   };
   ctx.ledger.saveSnapshot(ctx.runId, reqHash, { candidates: candidates.map(c => ({ company_id: c.company_id, name: c.name, trust_tier: c.trust_tier, headcount: c.headcount, contact: c.contact })) });
   return report;

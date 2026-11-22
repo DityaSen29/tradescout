@@ -78,7 +78,7 @@ const server = createServer(async (req, res) => {
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/retry$/)) && m === "POST") { const id = mm[1]; const b = await readBody(req); ledger.resetStepsFrom(id, b.from ?? "search", buildPipeline().map(s => s.name)); start(id, "resume"); return json(res, 202, { run_id: id, from: b.from ?? "search" }); }
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/ledger$/)) && m === "GET") return json(res, 200, { calls: ledger.listCalls(mm[1]), totals: ledger.totals(mm[1]), run: ledger.getRun(mm[1]) });
     if ((mm = p.match(/^\/api\/runs\/([^/]+)\/evidence$/)) && m === "GET") return json(res, 200, ledger.listEvidence(mm[1]));
-    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph, mirrored: rep.mirrored ?? null, cypher: `MATCH (n {run_id: "${mm[1]}"})-[r]->(m) RETURN n, r, m LIMIT 300` }); }
+    if ((mm = p.match(/^\/api\/runs\/([^/]+)\/graph$/)) && m === "GET") { const rep = ledger.stepOutput<any>(mm[1], "report")?.output; if (!rep) return json(res, 404, { error: "no report yet" }); return json(res, 200, { graph: rep.graph }); }
     if ((mm = p.match(/^\/api\/actions\/([^/]+)\/(approve|reject|execute)$/)) && m === "POST") {
       const [, id, verb] = mm;
       if (verb === "execute") return json(res, 200, await executeApproved(ledger, id));
