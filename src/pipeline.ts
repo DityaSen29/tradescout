@@ -1,7 +1,17 @@
 import type { StepDef } from "./runner/pipeline.js";
 import { parseRequest } from "./semantics/parse.js";
+import { searchStep } from "./steps/search.js";
+import { vetStep } from "./steps/vet.js";
+import { intentStep } from "./steps/intent.js";
+import { contactsStep } from "./steps/contacts.js";
+import { draftStep } from "./steps/draft.js";
+import { reportStep } from "./steps/report.js";
 
-/** The TradeScout pipeline. Steps are added milestone by milestone; each is a checkpoint. */
+/**
+ * The TradeScout pipeline. Each step is a checkpoint in the ledger.
+ * parse → search → vet → intent (optional) → contacts → draft → report
+ * Market, tariff and policy layers slot in after parse as optional steps.
+ */
 export function buildPipeline(): StepDef[] {
   return [
     {
@@ -13,17 +23,11 @@ export function buildPipeline(): StepDef[] {
         return r;
       },
     },
-    {
-      name: "report",
-      run: async (ctx) => {
-        const parse = ctx.outputs.parse as any;
-        return {
-          run_id: ctx.runId, request: ctx.request,
-          resolved: { hs_code: parse.hs.best?.code ?? null, hs_text: parse.hs.best?.text ?? null, country_iso3: parse.country?.iso3 ?? null, keywords: parse.keywords.expansions },
-          summary: `Resolved ${ctx.request.product} → HS ${parse.hs.best?.code ?? "?"} in ${parse.country?.name ?? "?"}`,
-          candidates: [], unresolved: parse.questions, actions: [], limitations: ["search, vetting and contacts not wired yet"],
-        };
-      },
-    },
+    { name: "search", run: searchStep },
+    { name: "vet", run: vetStep },
+    { name: "intent", run: intentStep, optional: true },
+    { name: "contacts", run: contactsStep, optional: true },
+    { name: "draft", run: draftStep },
+    { name: "report", run: reportStep },
   ];
 }
